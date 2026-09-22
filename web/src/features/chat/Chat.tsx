@@ -18,18 +18,20 @@ function ItemView({ it, busy, bypass }: { it: Item; busy: boolean; bypass: boole
   // mensagens do modo shell/comandos vindas do terminal chegam como blocos de código: renderiza como markdown
   if (it.kind === 'user') {
     const bubble = it.text.includes('```')
-      ? <div className="ml-auto max-w-[80%] rounded-lg bg-zinc-800 px-3 py-2"><Markdown text={it.text} /></div>
-      : <div className="ml-auto max-w-[80%] whitespace-pre-wrap rounded-lg bg-zinc-800 px-3 py-2">{it.text}</div>;
+      ? <div className="ml-auto max-w-[80%] rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2 text-sm text-zinc-100 shadow-sm"><Markdown text={it.text} /></div>
+      : <div className="ml-auto max-w-[80%] whitespace-pre-wrap rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2 text-sm text-zinc-100 shadow-sm">{it.text}</div>;
     if (!it.routedModel) return bubble;
     return (
       <div className="ml-auto max-w-[80%]">
-        <div className="mb-1 text-right text-[10px] text-zinc-600">roteado → {it.routedModel === 'haiku' ? 'Haiku' : 'Sonnet 5'}</div>
+        <div className="mb-1 flex items-center justify-end gap-1.5 font-mono text-[11px] text-zinc-500">
+          roteado → {it.routedModel === 'haiku' ? 'Haiku' : 'Sonnet 5'}
+        </div>
         {bubble}
       </div>
     );
   }
   if (it.kind === 'assistant') return <Markdown text={it.text} />;
-  if (it.kind === 'error') return <div className="whitespace-pre-wrap rounded border border-red-900 bg-red-950/40 px-3 py-2 text-sm text-red-300">{it.text}</div>;
+  if (it.kind === 'error') return <div className="whitespace-pre-wrap rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">{it.text}</div>;
   if (it.kind === 'shell') return <ShellCard it={it} busy={busy} />;
   if (it.kind === 'turn') return <TurnSummary modelUsage={it.modelUsage} bypass={bypass} />;
   return <ToolCard it={it} />;
@@ -39,7 +41,7 @@ function TurnLoading({ phase, startedAt, now }: { phase: 'routing' | 'thinking';
   const secs = Math.max(0, Math.round((now - startedAt) / 1000));
   const dot = phase === 'routing' ? 'routing-dot' : 'thinking-dot';
   return (
-    <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+    <div className="flex items-center gap-2 rounded-md border border-zinc-800/70 bg-zinc-900/40 px-2.5 py-1 font-mono text-[11px] text-zinc-400">
       <span className="flex items-center gap-0.5"><span className={dot} /><span className={dot} /><span className={dot} /></span>
       {phase === 'routing' ? 'Model Routing is helping you' : 'Claude Code is thinking'} … ({secs}s)
     </div>
@@ -51,9 +53,9 @@ function TurnSummary({ modelUsage, bypass }: { modelUsage: Record<string, ModelU
   const tok = Object.values(modelUsage).reduce((s, u) => s + u.input + u.output, 0);
   const models = Object.keys(modelUsage).map((id) => id.replace(/^claude-/, '').replace(/-\d{8}$/, '')).join(' + ');
   return (
-    <div className="text-center text-xs text-zinc-600">
+    <div className="flex items-center justify-center gap-2 text-center font-mono text-[11px] text-zinc-600">
       turno concluído — ${cost.toFixed(4)} · {fmtTokens(tok)} tokens · {models}
-      {bypass && <span className="ml-2 rounded bg-red-950/60 px-1.5 py-0.5 text-[10px] text-red-400">bypass</span>}
+      {bypass && <span className="rounded-sm border border-rose-500/20 bg-rose-500/10 px-1.5 py-0.5 text-[10px] tracking-wider text-rose-400/80">bypass</span>}
     </div>
   );
 }
