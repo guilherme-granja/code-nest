@@ -4,7 +4,7 @@ import { api } from '../../api';
 import { matchRow } from '../../lib/search';
 import { SIDEBAR_W_MAX, SIDEBAR_W_MIN, useApp } from '../../store';
 import { cycleTheme, getTheme, subscribeTheme, themeLabel } from '../../theme';
-import { ServerForm } from '../connect/ServerForm';
+import { AppSettingsModal } from '../../app/AppSettingsModal';
 import { ProjectSettingsModal } from './ProjectSettingsModal';
 
 const ago = (t: number) => {
@@ -94,7 +94,6 @@ export function Sidebar() {
   const [query, setQuery] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [addingServer, setAddingServer] = useState(false);
   const [form, setForm] = useState({ name: '', path: '', lean: false, connectionId: 'local' });
   const [err, setErr] = useState('');
   const connections = config?.connections ?? [];
@@ -240,18 +239,12 @@ export function Sidebar() {
         ) : (
           <button className="block text-sm text-zinc-400 hover:text-zinc-200" onClick={() => setAdding(true)}>+ Novo projeto</button>
         )}
-
-        {addingServer ? (
-          <div className="rounded border border-zinc-800 p-2">
-            <ServerForm onDone={async () => { setAddingServer(false); await reloadProjects(); }} />
-            <button className="mt-2 text-xs text-zinc-500" onClick={() => setAddingServer(false)}>Cancelar</button>
-          </div>
-        ) : (
-          <button className="block text-sm text-zinc-400 hover:text-zinc-200" onClick={() => setAddingServer(true)}>+ Servidor remoto</button>
-        )}
       </div>
-      <button className="m-3 flex items-center justify-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 py-1.5 text-xs font-medium text-zinc-200 transition-colors hover:bg-zinc-900 disabled:opacity-40" disabled={!projects.length} onClick={() => setUi({ newSession: true, newFor: null })}>+ Nova sessão</button>
+      <button className="m-3 flex items-center justify-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 py-1.5 text-xs font-medium text-zinc-200 transition-colors hover:bg-zinc-900" onClick={() => setUi({ appSettings: true })}>
+        <span className="material-symbols-outlined text-[14px]">settings</span> Configurações
+      </button>
       {ui.settingsFor && <ProjectSettingsModal projectId={ui.settingsFor} onClose={() => setUi({ settingsFor: null })} />}
+      {ui.appSettings && <AppSettingsModal onClose={() => setUi({ appSettings: false })} />}
     </aside>
   );
 }

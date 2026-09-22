@@ -30,6 +30,8 @@ const name = (max: number) => z.string().trim().min(1).max(max);
 export const createProjectBody = z.object({ name: name(80), path: z.string().min(1).max(1024), lean: z.boolean().default(false), connectionId: z.string().min(1).default('local') });
 export const createConnectionBody = z.object({ target: z.string().min(1).max(255), label: name(80).optional(), claudePath: z.string().max(255).optional() });
 export const patchProjectBody = z.object({ name: name(80).optional(), lean: z.boolean().optional(), routing: z.boolean().optional(), bypass: z.boolean().optional(), model: modelSchema.optional(), effort: effortSchema.optional() });
+export const patchConfigBody = z.object({ model: modelSchema.optional(), effort: effortSchema.optional(), maxBudgetUsd: z.number().positive().max(1000).optional() })
+  .refine((b) => b.model !== undefined || b.effort !== undefined || b.maxBudgetUsd !== undefined, { message: 'nada para alterar' });
 export const createSessionBody = z.object({ name: name(120), model: modelSchema.optional(), effort: effortSchema.optional() });
 const tag = z.string().trim().toLowerCase().min(1).max(30).regex(/^[\p{L}\p{N}_-]+$/u);
 export const patchSessionBody = z.object({

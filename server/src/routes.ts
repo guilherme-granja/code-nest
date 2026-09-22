@@ -3,7 +3,7 @@ import path from 'node:path';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import {
-  createConnectionBody, createProjectBody, createSessionBody, lastConnectionBody, patchProjectBody, patchSessionBody, uuidSchema,
+  createConnectionBody, createProjectBody, createSessionBody, lastConnectionBody, patchConfigBody, patchProjectBody, patchSessionBody, uuidSchema,
   type Connection, type Project, type SessionMeta, type SlashCommandInfo,
 } from '@ccui/shared';
 import { versionWarning, type Connections } from './connections';
@@ -28,6 +28,15 @@ export function buildApi({ store, hub, conns }: Deps) {
   const bad = (c: Context, msg: string) => c.json({ error: msg }, 400);
 
   api.get('/state', (c) => c.json({ config: store.config.data, projects: projects(), status: conns.all() }));
+
+  // padrões globais (modelo/effort/limite de gasto por sessão), configuráveis em runtime pela UI de configurações
+  api.patch('/config', async (c) => {
+    const b = await body(c, patchConfigBody);
+    if (!b) return bad(c, 'dados inválidos');
+    Object.assign(store.config.data.defaults, b);
+    await store.config.save();
+    return c.json(store.config.data);
+  });
 
   api.post('/last-connection', async (c) => {
     const b = await body(c, lastConnectionBody);
