@@ -20,7 +20,7 @@ export function CommandsPanel({ items, tasks }: { items: Item[]; tasks: TaskEntr
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-[14px] text-zinc-400">terminal</span>
           <span className="text-xs font-medium text-zinc-200">Terminal</span>
-          <span className="rounded-sm border border-zinc-800 bg-zinc-900 px-1.5 py-0.2 font-mono text-[9px] uppercase text-zinc-400">Read-only</span>
+          <span className="rounded-sm border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 font-mono text-[9px] uppercase text-zinc-400">Read-only</span>
         </div>
       </div>
       {tasks.length > 0 && (
