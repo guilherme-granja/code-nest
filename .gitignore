@@ -1,0 +1,77 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.npm/
+.yarn/
+.yarn-cache/
+
+# Build / generated output
+dist/
+build/
+out/
+.next/
+.nuxt/
+.vite/
+coverage/
+.cache/
+.parcel-cache/
+.turbo/
+
+# Runtime / temporary
+tmp/
+temp/
+logs/
+*.log
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+playwright-report/
+test-results/
+.nyc_output/
+
+# Generated files
+*.generated.*
+*.gen.*
+*.map
+
+# Docker / infrastructure generated data
+docker/data/
+docker/volumes/
+
+# Large/binary files
+*.zip
+*.tar
+*.gz
+*.7z
+*.pdf
+*.mp4
+*.mov
+*.avi
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+
+# Local databases
+*.sqlite
+*.sqlite3
+*.db
+
+# Misc
+storybook-static/

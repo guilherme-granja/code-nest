@@ -1,0 +1,21 @@
+{
+  "name": "claude-code-ui",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "shared",
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev:server": "CCUI_TOKEN=dev-token-local CCUI_DEV_ORIGIN=http://localhost:5173 CCUI_NO_OPEN=1 tsx watch server/src/index.ts",
+    "dev:web": "npm run dev -w web",
+    "build": "npm run build -w web",
+    "start": "tsx server/src/index.ts",
+    "typecheck": "tsc -p shared && tsc -p server && tsc -p web"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

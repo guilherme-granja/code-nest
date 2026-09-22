@@ -1,0 +1,60 @@
+@import "tailwindcss" theme(static);
+
+/* Espelhos da paleta original: o tema claro os lê (ler --color-* de dentro da própria redefinição criaria referência circular). */
+:root {
+  --z50: var(--color-zinc-50); --z100: var(--color-zinc-100); --z200: var(--color-zinc-200); --z300: var(--color-zinc-300); --z400: var(--color-zinc-400);
+  --z600: var(--color-zinc-600); --z700: var(--color-zinc-700); --z800: var(--color-zinc-800); --z900: var(--color-zinc-900); --z950: var(--color-zinc-950);
+  --amber50: var(--color-amber-50); --amber100: var(--color-amber-100); --amber200: var(--color-amber-200); --amber700: var(--color-amber-700); --amber800: var(--color-amber-800);
+  --red50: var(--color-red-50); --red200: var(--color-red-200); --red700: var(--color-red-700); --red800: var(--color-red-800);
+  --green50: var(--color-green-50); --green700: var(--color-green-700); --green800: var(--color-green-800);
+}
+
+body[data-theme='dark'] { color-scheme: dark; }
+
+/* Tema claro: inverte a escala zinc e ajusta os destaques; os componentes não mudam. O atributo fica no <body> (ver theme.ts). */
+body[data-theme='light'] {
+  color-scheme: light;
+  --color-zinc-50: var(--z950); --color-zinc-100: var(--z900); --color-zinc-200: var(--z800); --color-zinc-300: var(--z700); --color-zinc-400: var(--z600);
+  --color-zinc-600: var(--z400); --color-zinc-700: var(--z300); --color-zinc-800: var(--z200); --color-zinc-900: var(--z100); --color-zinc-950: var(--z50);
+  --color-amber-950: var(--amber50); --color-amber-900: var(--amber200); --color-amber-700: var(--amber700); --color-amber-400: var(--amber700); --color-amber-300: var(--amber800);
+  --color-red-950: var(--red50); --color-red-900: var(--red200); --color-red-400: var(--red700); --color-red-300: var(--red800);
+  --color-green-950: var(--green50); --color-green-400: var(--green700); --color-green-300: var(--green800);
+}
+
+/* Markdown das respostas (sem plugin typography) */
+.md { line-height: 1.6; overflow-wrap: anywhere; }
+.md > * + * { margin-top: 0.6em; }
+.md h1, .md h2, .md h3, .md h4 { font-weight: 600; }
+.md h1 { font-size: 1.25rem; } .md h2 { font-size: 1.125rem; } .md h3 { font-size: 1rem; }
+.md ul { list-style: disc; padding-left: 1.4em; } .md ol { list-style: decimal; padding-left: 1.4em; }
+.md li + li { margin-top: 0.2em; }
+.md a { color: var(--color-blue-400); text-decoration: underline; }
+.md code { background: var(--color-zinc-800); border-radius: 0.25rem; padding: 0.1em 0.35em; font-size: 0.9em; }
+.md pre { background: var(--color-zinc-900); border: 1px solid var(--color-zinc-800); border-radius: 0.5rem; padding: 0.75rem; overflow-x: auto; }
+.md pre code { background: none; padding: 0; }
+.md blockquote { border-left: 3px solid var(--color-zinc-700); padding-left: 0.8em; color: var(--color-zinc-400); }
+.md table { border-collapse: collapse; display: block; overflow-x: auto; }
+.md th, .md td { border: 1px solid var(--color-zinc-700); padding: 0.25rem 0.5rem; }
+.md hr { border-color: var(--color-zinc-700); }
+
+/* Realce de sintaxe (rehype-highlight/hljs) com cores próprias que acompanham o tema */
+.hljs-comment, .hljs-quote { color: var(--color-zinc-500); font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-doctag { color: var(--color-purple-400); }
+.hljs-string, .hljs-regexp, .hljs-addition { color: var(--color-green-400); }
+.hljs-number, .hljs-symbol, .hljs-bullet, .hljs-attr, .hljs-variable, .hljs-template-variable { color: var(--color-amber-400); }
+.hljs-title, .hljs-section { color: var(--color-blue-400); }
+.hljs-built_in, .hljs-type, .hljs-name, .hljs-selector-id, .hljs-selector-class { color: var(--color-cyan-400); }
+.hljs-deletion { color: var(--color-red-400); }
+.hljs-emphasis { font-style: italic; } .hljs-strong { font-weight: 700; }
+body[data-theme='light'] .md a, body[data-theme='light'] .hljs-title, body[data-theme='light'] .hljs-section { color: var(--color-blue-700); }
+body[data-theme='light'] .hljs-keyword, body[data-theme='light'] .hljs-selector-tag, body[data-theme='light'] .hljs-literal, body[data-theme='light'] .hljs-doctag { color: var(--color-purple-700); }
+body[data-theme='light'] .hljs-built_in, body[data-theme='light'] .hljs-type, body[data-theme='light'] .hljs-name, body[data-theme='light'] .hljs-selector-id, body[data-theme='light'] .hljs-selector-class { color: var(--color-cyan-700); }
+
+/* Indicador de turno: pontinhos do Model Routing (azul/âmbar/verde, indo e vindo) e do "pensando" (pulso simples) */
+@keyframes routing-dot { 0%, 100% { background-color: var(--color-blue-500); transform: translateY(0); } 33% { background-color: var(--color-amber-500); transform: translateY(-3px); } 66% { background-color: var(--color-green-500); transform: translateY(0); } }
+@keyframes thinking-dot { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+.routing-dot, .thinking-dot { display: inline-block; width: 0.375rem; height: 0.375rem; border-radius: 9999px; }
+.routing-dot { animation: routing-dot 1.2s ease-in-out infinite; }
+.thinking-dot { background: var(--color-zinc-500); animation: thinking-dot 1s ease-in-out infinite; }
+.routing-dot:nth-child(2), .thinking-dot:nth-child(2) { animation-delay: 0.15s; }
+.routing-dot:nth-child(3), .thinking-dot:nth-child(3) { animation-delay: 0.3s; }

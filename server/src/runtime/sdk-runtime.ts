@@ -1,0 +1,229 @@
+import { randomUUID } from 'node:crypto';
+import { createSdkMcpServer, query, tool, type CanUseTool, type PermissionResult, type Query, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
+import { EFFORTS, MODELS, type EventBody, type HistoryItem, type Model, type ModelUsage, type ShellResult, type SlashCommandInfo, type UsageTotals } from '@ccui/shared';
+import { z } from 'zod';
+import { visibleCommands } from '../commands';
+import { mapMessage } from './events';
+import { classifyHeuristic, CLASSIFY_SYSTEM_PROMPT } from './routing';
+import type { ClaudeRuntime, LiveSession, OpenOptions, SessionInfo, Transport } from './types';
+
+const PERMISSION_TIMEOUT_MS = 10 * 60_000;
+const CLASSIFY_TIMEOUT_MS = 15_000;
+
+// lê a 1ª resposta de texto do assistente e fecha; usado pelo classificador descartável (sem persistir sessão)
+async function firstAssistantText(q: Query): Promise<string> {
+  for await (const m of q) {
+    if (m.type === 'assistant') {
+      const b = m.message.content.find((c) => c.type === 'text');
+      if (b && 'text' in b) return b.text;
+    }
+  }
+  return '';
+}
+
+// fila assíncrona: produtor faz push, consumidor faz for-await
+function channel<T>() {
+  const q: T[] = [];
+  let wake: (() => void) | null = null;
+  let done = false;
+  return {
+    push(v: T) { q.push(v); wake?.(); },
+    end() { done = true; wake?.(); },
+    async *[Symbol.asyncIterator](): AsyncGenerator<T> {
+      while (true) {
+        if (q.length) { yield q.shift()!; continue; }
+        if (done) return;
+        await new Promise<void>((r) => (wake = r));
+        wake = null;
+      }
+    },
+  };
+}
+
+export const forbiddenModel = (m?: string) => !!m && /opus|fable/i.test(m);
+
+class Live implements LiveSession {
+  private input = channel<SDKUserMessage>();
+  private out = channel<EventBody>();
+  readonly events: AsyncIterable<EventBody> = this.out;
+  private pending = new Map<string, (allow: boolean, why?: string, updatedInput?: Record<string, unknown>) => void>();
+  // task_id (interno do SDK) -> taskId (tool_use_id do Task tool) — só task_updated/task_progress precisam disto,
+  // pois não trazem tool_use_id; populado quando task_started passa pelo loop em run().
+  private taskIds = new Map<string, string>();
+  private stderrTail = '';
+  private q: Query;
+  private pump: Promise<void>;
+
+  private canUseTool: CanUseTool = (toolName, input, { signal }) =>
+    new Promise<PermissionResult>((resolve) => {
+      const reqId = randomUUID();
+      const done = (allow: boolean, why?: string, updatedInput?: Record<string, unknown>) => {
+        if (!this.pending.delete(reqId)) return;
+        clearTimeout(timer);
+        this.out.push({ type: 'permission.resolved', reqId, allow });
+        // updatedInput: canal usado pelo AskUserQuestion pra devolver as respostas do usuário (mesmo mecanismo de permissão)
+        resolve(allow ? { behavior: 'allow', updatedInput: updatedInput ?? input } : { behavior: 'deny', message: why ?? 'Negado pelo usuário' });
+      };
+      const timer = setTimeout(() => done(false, 'Sem resposta em 10 min'), PERMISSION_TIMEOUT_MS);
+      signal.addEventListener('abort', () => done(false, 'Cancelado'), { once: true });
+      this.pending.set(reqId, done);
+      this.out.push({ type: 'permission.requested', reqId, toolName, input });
+    });
+
+  constructor(o: OpenOptions, resume: boolean, transport: Transport) {
+    const routingServer = o.routing ? createSdkMcpServer({
+      name: 'routing',
+      tools: [tool(
+        'request_model_upgrade',
+        'Pede pra trocar de Haiku pra Sonnet 5 no meio da tarefa, quando ela precisar de mais raciocínio do que o esperado.',
+        { reason: z.string().min(1).max(300) },
+        async ({ reason }) => {
+          await this.q.setModel('sonnet'); // só roda depois que canUseTool já aprovou a chamada desta tool
+          return { content: [{ type: 'text', text: `Modelo trocado pra Sonnet 5. Motivo: ${reason}` }] };
+        },
+      )],
+    }) : undefined;
+    this.q = query({
+      prompt: this.input,
+      options: {
+        cwd: o.cwd,
+        ...(resume ? { resume: o.sessionId } : { sessionId: o.sessionId }),
+        model: o.model,
+        effort: o.effort,
+        maxBudgetUsd: o.maxBudgetUsd,
+        permissionMode: o.permissionMode,
+        allowDangerouslySkipPermissions: o.permissionMode === 'bypassPermissions',
+        systemPrompt: o.routing
+          ? { type: 'preset', preset: 'claude_code', append: 'Este projeto usa roteamento de modelo pra economizar tokens: se você estiver rodando em Haiku e perceber que a tarefa precisa de mais raciocínio (mudanças em vários arquivos, arquitetura, lógica complexa), chame a ferramenta request_model_upgrade explicando o motivo antes de continuar.' }
+          : { type: 'preset', preset: 'claude_code' },
+        settingSources: o.lean ? [] : ['user', 'project', 'local'],
+        includePartialMessages: true,
+        canUseTool: this.canUseTool,
+        ...(routingServer ? { mcpServers: { routing: routingServer } } : {}),
+        spawnClaudeCodeProcess: (so) => transport.spawn(so, (s) => { this.stderrTail = (this.stderrTail + s).slice(-2000); }),
+      },
+    });
+    this.pump = this.run();
+  }
+
+  private async run() {
+    try {
+      for await (const m of this.q) {
+        // defesa em profundidade: a allowlist é aplicada em open(); aqui confere o modelo efetivo no init e em CADA resposta
+        // (cobre qualquer caminho que troque o modelo no meio da sessão: comando, configuração, ambiente)
+        const model = m.type === 'system' && m.subtype === 'init' ? m.model : m.type === 'assistant' ? m.message.model : undefined;
+        if (forbiddenModel(model)) {
+          this.out.push({ type: 'error', code: 'runtime', message: `modelo não permitido: ${model}. A sessão foi encerrada.` });
+          this.q.close();
+          break;
+        }
+        if (m.type === 'system' && m.subtype === 'task_started' && m.tool_use_id) this.taskIds.set(m.task_id, m.tool_use_id);
+        if (m.type === 'system' && m.subtype === 'task_updated') {
+          const taskId = this.taskIds.get(m.task_id);
+          if (taskId && m.patch.status) this.out.push({ type: 'task.updated', taskId, status: m.patch.status });
+          continue; // mapMessage não trata task_updated (não tem tool_use_id pra tagueá-lo sozinho)
+        }
+        for (const b of mapMessage(m)) this.out.push(b);
+      }
+    } catch (e) {
+      this.out.push({ type: 'error', code: 'exit', message: `${(e as Error).message}\n${this.stderrTail}`.trim() });
+    } finally {
+      for (const done of [...this.pending.values()]) done(false, 'Sessão encerrada');
+      this.out.end();
+    }
+  }
+
+  send(text: string) {
+    this.input.push({ type: 'user', message: { role: 'user', content: text }, parent_tool_use_id: null });
+  }
+  async interrupt() { await this.q.interrupt(); }
+  async setModel(model: Model) { await this.q.setModel(model); }
+  answerPermission(reqId: string, allow: boolean, updatedInput?: Record<string, unknown>) { this.pending.get(reqId)?.(allow, undefined, updatedInput); }
+
+  // fecha stdin (EOF) => o claude sai sozinho; se não sair em 2 s, encerra à força
+  async close() {
+    this.input.end();
+    const t = setTimeout(() => this.q.close(), 2000);
+    await this.pump;
+    clearTimeout(t);
+  }
+}
+
+const IDLE_WAIT_MS = 30_000;
+const COMMANDS_TIMEOUT_MS = 25_000;
+
+export class SdkRuntime implements ClaudeRuntime {
+  constructor(private transport: Transport) {}
+
+  listSessions(cwd: string): Promise<SessionInfo[]> { return this.transport.listSessions(cwd); }
+  history(sessionId: string, cwd: string): Promise<HistoryItem[]> { return this.transport.history(sessionId, cwd); }
+
+  shell(cwd: string, command: string): Promise<ShellResult> { return this.transport.shell(cwd, command); }
+  usage(sessionId: string, cwd: string): Promise<{ totals: UsageTotals; modelUsage: Record<string, ModelUsage> } | null> { return this.transport.usage(sessionId, cwd); }
+
+  async classify(cwd: string, text: string): Promise<Model> {
+    return classifyHeuristic(text) ?? this.classifyViaHaiku(cwd, text);
+  }
+
+  private async classifyViaHaiku(cwd: string, text: string): Promise<Model> {
+    const input = channel<SDKUserMessage>();
+    const q = query({
+      prompt: input,
+      options: {
+        cwd, model: 'haiku', persistSession: false, maxTurns: 1,
+        systemPrompt: { type: 'custom', prompt: CLASSIFY_SYSTEM_PROMPT },
+        settingSources: [],
+        spawnClaudeCodeProcess: (so) => this.transport.spawn(so, () => {}),
+      },
+    });
+    input.push({ type: 'user', message: { role: 'user', content: text.slice(0, 2000) }, parent_tool_use_id: null });
+    input.end();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const timeout = new Promise<never>((_, rej) => { timer = setTimeout(() => rej(new Error('timeout ao classificar')), CLASSIFY_TIMEOUT_MS); });
+      const answer = await Promise.race([firstAssistantText(q), timeout]);
+      return /\bhaiku\b/i.test(answer) ? 'haiku' : 'sonnet';
+    } catch {
+      return 'sonnet'; // falha/ambíguo: vai pro modelo maior, nunca pro barato
+    } finally {
+      clearTimeout(timer);
+      q.close();
+    }
+  }
+
+  // Sobe um processo sem enviar mensagem: o SDK responde a lista de comandos pelo canal de controle (sem custo de tokens).
+  async commands(cwd: string, lean: boolean): Promise<SlashCommandInfo[]> {
+    const input = channel<SDKUserMessage>();
+    const q = query({
+      prompt: input,
+      options: {
+        cwd, model: 'haiku', persistSession: false,
+        systemPrompt: { type: 'preset', preset: 'claude_code' },
+        settingSources: lean ? [] : ['user', 'project', 'local'],
+        spawnClaudeCodeProcess: (so) => this.transport.spawn(so, () => {}),
+      },
+    });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const timeout = new Promise<never>((_, rej) => { timer = setTimeout(() => rej(new Error('timeout ao listar comandos')), COMMANDS_TIMEOUT_MS); });
+      return visibleCommands(await Promise.race([q.supportedCommands(), timeout]));
+    } finally {
+      clearTimeout(timer);
+      input.end();
+      q.close();
+    }
+  }
+
+  async settle(sessionId: string, _cwd?: string): Promise<void> {
+    await this.transport.waitSessionIdle(sessionId, IDLE_WAIT_MS).catch(() => {});
+  }
+
+  async open(o: OpenOptions): Promise<LiveSession> {
+    if (!MODELS.includes(o.model) || !EFFORTS.includes(o.effort)) throw new Error('modelo/effort não permitido');
+    if (o.permissionMode !== 'default' && o.permissionMode !== 'plan' && o.permissionMode !== 'bypassPermissions') throw new Error('permissionMode não permitido');
+    const exists = await this.transport.sessionExists(o.sessionId, o.cwd);
+    // remoto: um claude antigo pode estar terminando o turno; dois escritores no mesmo jsonl corromperiam o histórico
+    if (exists) await this.transport.waitSessionIdle(o.sessionId, IDLE_WAIT_MS);
+    return new Live(o, exists, this.transport);
+  }
+}

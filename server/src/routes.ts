@@ -1,0 +1,179 @@
+import { randomUUID } from 'node:crypto';
+import path from 'node:path';
+import { Hono, type Context } from 'hono';
+import { z } from 'zod';
+import {
+  createConnectionBody, createProjectBody, createSessionBody, lastConnectionBody, patchProjectBody, patchSessionBody, uuidSchema,
+  type Connection, type Project, type SessionMeta, type SlashCommandInfo,
+} from '@ccui/shared';
+import { versionWarning, type Connections } from './connections';
+import { ensureMeta, listProjectSessions } from './domain';
+import { parseGitStatus } from './git';
+import type { SessionHub } from './hub';
+import { checkConnection, validClaudePath, validTarget } from './ssh-util';
+import type { Store } from './store';
+
+interface Deps { store: Store; hub: SessionHub; conns: Connections }
+
+const body = async <T extends z.ZodTypeAny>(c: Context, schema: T): Promise<z.infer<T> | null> => {
+  const r = schema.safeParse(await c.req.json().catch(() => null));
+  return r.success ? r.data : null;
+};
+
+export function buildApi({ store, hub, conns }: Deps) {
+  const api = new Hono();
+  const projects = () => store.projects.data.projects;
+  const connections = () => store.config.data.connections;
+  const project = (id: string) => projects().find((p) => p.id === id);
+  const bad = (c: Context, msg: string) => c.json({ error: msg }, 400);
+
+  api.get('/state', (c) => c.json({ config: store.config.data, projects: projects(), status: conns.all() }));
+
+  api.post('/last-connection', async (c) => {
+    const b = await body(c, lastConnectionBody);
+    if (!b || !connections().some((x) => x.id === b.connectionId)) return bad(c, 'conexão inválida');
+    store.config.data.lastConnectionId = b.connectionId;
+    await store.config.save();
+    return c.body(null, 204);
+  });
+
+  // valida target/claudePath e testa a conexão real (ssh + claude --version); não salva nada
+  const probe = async (c: Context) => {
+    const b = await body(c, createConnectionBody);
+    if (!b) return { err: bad(c, 'dados inválidos') };
+    if (!validTarget(b.target)) return { err: bad(c, 'destino inválido: use usuario@host') };
+    if (b.claudePath !== undefined && !validClaudePath(b.claudePath)) return { err: bad(c, 'caminho do claude inválido') };
+    const r = await checkConnection(b.target, b.claudePath);
+    return { b, r };
+  };
+
+  api.post('/connections/test', async (c) => {
+    const p = await probe(c);
+    if (p.err) return p.err;
+    return c.json(p.r.ok ? { ok: true, version: p.r.version, warning: versionWarning(p.r.version) } : { ok: false, error: p.r.error });
+  });
+
+  api.post('/connections', async (c) => {
+    const p = await probe(c);
+    if (p.err) return p.err;
+    if (!p.r.ok) return bad(c, p.r.error);
+    if (connections().some((x) => x.target === p.b.target)) return c.json({ error: 'servidor já cadastrado' }, 409);
+    const conn: Connection = {
+      id: 'ssh-' + p.b.target.replace(/[^A-Za-z0-9]/g, '-'), kind: 'ssh', target: p.b.target, label: p.b.label ?? p.b.target,
+      ...(p.b.claudePath ? { claudePath: p.b.claudePath } : {}),
+    };
+    connections().push(conn);
+    await store.config.save();
+    conns.markUp(conn.id);
+    return c.json({ connection: conn, warning: versionWarning(p.r.version) });
+  });
+
+  // remove só metadata nossa; sessões vivas dessa conexão terminam sozinhas (Fase 3: encerrar ao remover)
+  api.delete('/connections/:id', async (c) => {
+    const id = c.req.param('id');
+    if (id === 'local') return bad(c, 'a conexão local não pode ser removida');
+    const doomed = new Set(projects().filter((p) => p.connectionId === id).map((p) => p.id));
+    store.config.data.connections = connections().filter((x) => x.id !== id);
+    if (store.config.data.lastConnectionId === id) store.config.data.lastConnectionId = 'local';
+    store.projects.data.projects = projects().filter((p) => !doomed.has(p.id));
+    store.sessions.data.sessions = store.sessions.data.sessions.filter((s) => !doomed.has(s.projectId));
+    conns.drop(id);
+    await Promise.all([store.config.save(), store.projects.save(), store.sessions.save()]);
+    return c.body(null, 204);
+  });
+
+  api.post('/projects', async (c) => {
+    const b = await body(c, createProjectBody);
+    if (!b) return bad(c, 'dados inválidos');
+    if (!connections().some((x) => x.id === b.connectionId)) return bad(c, 'conexão inválida');
+    // caminhos POSIX (local Linux/macOS e remoto Linux); sem caracteres de controle
+    const p = path.posix.normalize(b.path);
+    if (!p.startsWith('/') || /[\u0000-\u001f]/.test(p)) return bad(c, 'o caminho deve ser absoluto');
+    if (!(await conns.get(b.connectionId).transport.isDirectory(p))) return bad(c, 'diretório não encontrado');
+    if (projects().some((x) => x.connectionId === b.connectionId && x.path === p)) return c.json({ error: 'projeto já cadastrado' }, 409);
+    const created: Project = { id: randomUUID(), name: b.name, connectionId: b.connectionId, path: p, lean: b.lean };
+    projects().push(created);
+    await store.projects.save();
+    return c.json(created);
+  });
+
+  api.patch('/projects/:id', async (c) => {
+    const p = project(c.req.param('id'));
+    const b = await body(c, patchProjectBody);
+    if (!p || !b) return bad(c, 'dados inválidos');
+    Object.assign(p, b);
+    await store.projects.save();
+    return c.json(p);
+  });
+
+  // remove só metadata nossa; nunca toca no jsonl do Claude
+  api.delete('/projects/:id', async (c) => {
+    const id = c.req.param('id');
+    store.projects.data.projects = projects().filter((p) => p.id !== id);
+    store.sessions.data.sessions = store.sessions.data.sessions.filter((s) => s.projectId !== id);
+    await Promise.all([store.projects.save(), store.sessions.save()]);
+    return c.body(null, 204);
+  });
+
+  api.get('/projects/:id/sessions', async (c) => {
+    const p = project(c.req.param('id'));
+    if (!p) return c.json({ error: 'projeto desconhecido' }, 404);
+    return c.json(await listProjectSessions(store, conns.get(p.connectionId).runtime, hub, p));
+  });
+
+  // comandos `/` do projeto para o autocomplete; cache de 5 min por (projeto, lean); falha => lista vazia (a UI tenta de novo depois)
+  const cmdCache = new Map<string, { at: number; list: SlashCommandInfo[] }>();
+  const cmdInflight = new Map<string, Promise<SlashCommandInfo[]>>();
+  api.get('/projects/:id/commands', async (c) => {
+    const p = project(c.req.param('id'));
+    if (!p) return c.json({ error: 'projeto desconhecido' }, 404);
+    const key = `${p.id}:${p.lean}`;
+    const hit = cmdCache.get(key);
+    if (hit && Date.now() - hit.at < 5 * 60_000) return c.json(hit.list);
+    let job = cmdInflight.get(key);
+    if (!job) {
+      job = conns.get(p.connectionId).runtime.commands(p.path, p.lean).finally(() => cmdInflight.delete(key));
+      cmdInflight.set(key, job);
+    }
+    try {
+      const list = await job;
+      cmdCache.set(key, { at: Date.now(), list });
+      return c.json(list);
+    } catch { return c.json([]); }
+  });
+
+  // branch/status do Git do projeto (null quando não é um repositório ou o servidor não responde)
+  api.get('/projects/:id/git', async (c) => {
+    const p = project(c.req.param('id'));
+    if (!p) return c.json({ error: 'projeto desconhecido' }, 404);
+    const out = await conns.get(p.connectionId).transport.git(p.path);
+    return c.json(out === null ? null : parseGitStatus(out));
+  });
+
+  api.post('/projects/:id/sessions', async (c) => {
+    const p = project(c.req.param('id'));
+    const b = await body(c, createSessionBody);
+    if (!p || !b) return bad(c, 'dados inválidos');
+    const now = Date.now();
+    const meta: SessionMeta = { sessionId: randomUUID(), projectId: p.id, name: b.name, model: b.model, effort: b.effort, createdAt: now, lastUsedAt: now };
+    store.sessions.data.sessions.push(meta);
+    await store.sessions.save();
+    return c.json(meta);
+  });
+
+  api.patch('/sessions/:id', async (c) => {
+    const id = uuidSchema.safeParse(c.req.param('id'));
+    const b = await body(c, patchSessionBody);
+    if (!id.success || !b) return bad(c, 'dados inválidos');
+    try { await ensureMeta(store, id.data, b.projectId); } catch (e) { return bad(c, (e as Error).message); }
+    const meta = store.sessions.data.sessions.find((s) => s.sessionId === id.data)!;
+    if (b.name !== undefined) meta.name = b.name;
+    if (b.favorite !== undefined) meta.favorite = b.favorite;
+    if (b.archived !== undefined) meta.archived = b.archived;
+    if (b.tags !== undefined) meta.tags = [...new Set(b.tags)];
+    await store.sessions.save();
+    return c.body(null, 204);
+  });
+
+  return api;
+}
