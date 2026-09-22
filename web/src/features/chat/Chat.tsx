@@ -175,11 +175,11 @@ export function Chat() {
         return q ? <AskUserQuestionModal p={q} onAnswer={(allow, updatedInput) => answer(q.reqId, allow, updatedInput)} /> : null;
       })()}
 
-      <div className="relative border-t border-zinc-800 p-3">
+      <div className="relative border-t border-zinc-800/70 bg-zinc-950 p-3">
         {menuOpen && <SlashMenu items={matches} sel={Math.min(sel, matches.length - 1)} lean={!!project?.lean} onPick={pick} onHover={setSel} />}
         <textarea
           ref={input}
-          className="h-20 w-full resize-none rounded-md border border-zinc-800 bg-zinc-900 p-2.5 text-sm outline-none transition-colors duration-150 focus:border-zinc-600 disabled:opacity-50"
+          className="h-20 w-full resize-none rounded-xl border border-zinc-800 bg-zinc-900/90 p-3 text-sm text-zinc-100 outline-none transition-colors duration-150 placeholder:text-zinc-500 focus:border-zinc-700 disabled:opacity-50"
           placeholder={busy ? 'Aguarde a resposta…' : 'Mensagem… ("/" comandos · "!" shell · Enter envia · Shift+Enter quebra linha)'}
           value={text}
           disabled={busy || !up}
