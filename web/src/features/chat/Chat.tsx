@@ -24,6 +24,7 @@ function ItemView({ it, busy, bypass }: { it: Item; busy: boolean; bypass: boole
     return (
       <div className="ml-auto max-w-[80%]">
         <div className="mb-1 flex items-center justify-end gap-1.5 font-mono text-[11px] text-zinc-500">
+          <span className="material-symbols-outlined text-[12px]">alt_route</span>
           roteado → {it.routedModel === 'haiku' ? 'Haiku' : 'Sonnet 5'}
         </div>
         {bubble}
@@ -149,6 +150,7 @@ export function Chat() {
         {chat.pending.filter((p) => !isAskUserQuestion(p)).map((p) => (
           <div key={p.reqId} className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/50 shadow-md">
             <div className="flex items-center gap-2.5 border-b border-zinc-800/80 bg-zinc-900/60 px-4 py-3">
+              <span className="material-symbols-outlined text-[18px] text-amber-400">lock</span>
               <div className="text-xs font-semibold text-zinc-100">
                 {p.toolName === 'request_model_upgrade'
                   ? <>Claude quer trocar pra <span className="text-zinc-100">Sonnet 5</span> — {String((p.input as { reason?: unknown } | null)?.reason ?? '')}</>
