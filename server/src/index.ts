@@ -38,7 +38,7 @@ broadcast = attachWs(server, { port: PORT, token, hub, store, statuses: () => co
 conns.start();
 
 const url = `${process.env.CCUI_DEV_ORIGIN ?? `http://127.0.0.1:${PORT}`}/#token=${token}`;
-console.log(`Claude Code UI: ${url}`);
+console.log(`Code Nest: ${url}`);
 // ponytail: só Linux/macOS
 if (!process.env.CCUI_NO_OPEN) spawn(process.platform === 'darwin' ? 'open' : 'xdg-open', [url], { stdio: 'ignore', detached: true }).on('error', () => {}).unref();
 

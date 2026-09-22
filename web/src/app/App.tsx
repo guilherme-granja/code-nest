@@ -29,7 +29,7 @@ export function App() {
     return () => window.removeEventListener('keydown', h);
   }, [setUi, cycleTab, toggleSidebar]);
 
-  if (tokenMissing) return <div className="p-8 text-zinc-300">Abra a UI pelo link impresso no terminal (<code>Claude Code UI: http://…/#token=…</code>).</div>;
+  if (tokenMissing) return <div className="p-8 text-zinc-300">Abra a UI pelo link impresso no terminal (<code>Code Nest: http://…/#token=…</code>).</div>;
   if (!config) return <div className="p-8 text-zinc-500">Carregando…</div>;
   if (!config.lastConnectionId) return <ConnectScreen />;
   return (

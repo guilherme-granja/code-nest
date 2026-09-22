@@ -1,4 +1,4 @@
-# Claude Code UI
+# Code Nest
 
 Web app to run Claude Code sessions in the browser instead of the terminal: chat, multiple tabs/sessions, local and remote projects via SSH, Model Routing (per-message Haiku/Sonnet).
 

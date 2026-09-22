@@ -67,6 +67,7 @@ docker/volumes/
 *.jpeg
 *.gif
 *.webp
+!web/public/**
 
 # Local databases
 *.sqlite

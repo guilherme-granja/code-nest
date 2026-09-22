@@ -2,7 +2,7 @@
 
 ## Overview
 
-Claude Code UI is a web app (browser) that opens and talks to Claude Code sessions, local or remote (SSH), via `@anthropic-ai/claude-agent-sdk`. The Node backend (Hono + WebSocket) holds the state of each session and bridges the SDK with connected clients; the React frontend consumes events over WebSocket and renders chat, tabs, the read-only terminal, etc.
+Code Nest is a web app (browser) that opens and talks to Claude Code sessions, local or remote (SSH), via `@anthropic-ai/claude-agent-sdk`. The Node backend (Hono + WebSocket) holds the state of each session and bridges the SDK with connected clients; the React frontend consumes events over WebSocket and renders chat, tabs, the read-only terminal, etc.
 
 ## Main components
 

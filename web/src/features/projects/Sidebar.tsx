@@ -101,6 +101,10 @@ export function Sidebar() {
 
   return (
     <aside className="flex h-screen w-72 shrink-0 flex-col border-r border-zinc-800/70 bg-zinc-950">
+      <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-zinc-800/60 px-3">
+        <img src="/logo.png" alt="" className="h-5 w-5 shrink-0 rounded-[5px]" />
+        <span className="text-sm font-medium tracking-tight text-zinc-100">Code Nest</span>
+      </div>
       <div className="space-y-2.5 border-b border-zinc-800/60 p-3">
         <div className="flex items-center gap-2 rounded-md border border-zinc-800/80 bg-zinc-900/60 px-2.5 py-1.5 text-zinc-400 transition-colors focus-within:border-zinc-700">
           <input className="min-w-0 flex-1 bg-transparent text-xs text-zinc-200 outline-none placeholder:text-zinc-500" placeholder="Buscar sessões ou #tag…" value={query} onChange={(e) => setQuery(e.target.value)} />

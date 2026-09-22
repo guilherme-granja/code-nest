@@ -105,7 +105,7 @@ export const useApp = create<App>((set, get) => {
       // contador de sessões que pedem atenção no título da aba; limpa a da sessão ativa ao voltar para a janela
       useApp.subscribe((s) => {
         const n = Object.values(s.attention).filter(Boolean).length;
-        document.title = `${n ? `(${n}) ` : ''}Claude Code UI`;
+        document.title = `${n ? `(${n}) ` : ''}Code Nest`;
       });
       document.addEventListener('visibilitychange', () => {
         const a = get().active;
