@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { IconTerminal } from '../../lib/icons';
 import type { Item, TaskEntry } from './reduce';
 import { ToolCard } from './ToolCard';
 
@@ -18,7 +19,7 @@ export function CommandsPanel({ items, tasks }: { items: Item[]; tasks: TaskEntr
     <div className="flex h-56 shrink-0 flex-col border-t border-zinc-800/80 bg-zinc-950 text-xs">
       <div className="flex shrink-0 items-center justify-between border-b border-zinc-800/80 px-3.5 py-2 font-sans">
         <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-[14px] text-zinc-400">terminal</span>
+          <IconTerminal className="h-3.5 w-3.5 text-zinc-400" />
           <span className="text-xs font-medium text-zinc-200">Terminal</span>
           <span className="rounded-sm border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 font-mono text-[9px] uppercase text-zinc-400">Read-only</span>
         </div>
