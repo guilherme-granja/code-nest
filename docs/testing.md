@@ -1,37 +1,37 @@
 # Testing
 
-## Estado real (decisão explícita, não pendência)
+## Actual state (deliberate decision, not pending work)
 
-O projeto **não tem testes automatizados** e **não tem git init**. Ambos foram escolha deliberada do usuário nesta fase — não sugerir adicionar Vitest/Jest, `npm test`, `git init` ou CI a menos que o usuário peça explicitamente.
+The project **has no automated tests**. This was a deliberate user choice for this phase — don't suggest adding Vitest/Jest, `npm test`, or CI unless the user explicitly asks.
 
-## Comandos reais disponíveis (`package.json`)
+## Real commands available (`package.json`)
 
-- `npm run typecheck` → `tsc -p shared && tsc -p server && tsc -p web` — checa os 3 workspaces, sem emitir output.
-- `npm run build` → `npm run build -w web` — build de produção do frontend pra `web/dist`.
-- `npm run dev:server` — backend em modo watch (`tsx watch`), token/origin de dev fixos.
-- `npm run dev:web` — Vite dev server do frontend.
-- `npm run start` — roda o backend direto com `tsx` (produção, serve `web/dist` estático).
-- `./restart.sh` — para o backend rodando (via PID do lock), builda e sobe de novo em background.
+- `npm run typecheck` -> `tsc -p shared && tsc -p server && tsc -p web` — checks all 3 workspaces, no emitted output.
+- `npm run build` -> `npm run build -w web` — production build of the frontend into `web/dist`.
+- `npm run dev:server` — backend in watch mode (`tsx watch`), fixed dev token/origin.
+- `npm run dev:web` — Vite dev server for the frontend.
+- `npm run start` — runs the backend directly with `tsx` (production, serves static `web/dist`).
+- `./restart.sh` — stops the running backend (via the lock's PID), builds, and starts it again in the background.
 
-Não existe script de `lint` no `package.json` — não documentar nem sugerir um até existir.
+There is no `lint` script in `package.json` — don't document or suggest one until it exists.
 
-## Validação disponível hoje
+## Validation available today
 
-- **Typecheck**: `npm run typecheck` é a única checagem automatizada de correção existente. Roda limpo como critério mínimo antes de considerar uma mudança pronta.
-- **Build**: `npm run build` confirma que o frontend compila/empacota.
-- **Validação manual da UI**: browser não é controlável pela IA neste ambiente (só há Firefox local, e seu `--screenshot` dispara antes da SPA carregar) — nenhuma tela foi verificada visualmente por uma IA. O usuário testa manualmente no browser e reporta o que precisa de ajuste.
+- **Typecheck**: `npm run typecheck` is the only automated correctness check that exists. Run it clean as the minimum bar before considering a change done.
+- **Build**: `npm run build` confirms the frontend compiles/bundles.
+- **Manual UI validation**: the browser isn't controllable by AI in this environment (only local Firefox is available, and its `--screenshot` fires before the SPA loads) — no screen has been visually verified by an AI. The user tests manually in the browser and reports what needs adjusting.
 
-## O que checar manualmente quando relevante
+## What to check manually when relevant
 
-Ao mudar algo em `web/src/features/*` ou no protocolo de eventos (`shared/src/index.ts`), pedir ao usuário para confirmar manualmente (ou verificar você mesmo se conseguir rodar `npm run dev:server` + `npm run dev:web` e abrir o browser):
+When changing anything in `web/src/features/*` or the event protocol (`shared/src/index.ts`), ask the user to confirm manually (or verify it yourself if you can run `npm run dev:server` + `npm run dev:web` and open the browser):
 
-- Chat renderiza e streama corretamente (delta + completed).
-- Tabs abrem/fecham e mantêm o estado da sessão em background.
-- Indicador de fase do turno (routing/thinking) aparece e some no momento certo.
-- Modal `AskUserQuestion` envia a resposta certa via `updatedInput`.
-- Toggle de bypass/routing no Sidebar reflete no comportamento real da próxima mensagem.
-- Terminal read-only (`CommandsPanel`) mostra `!cmd` e tabs de Task sem aceitar input.
+- Chat renders and streams correctly (delta + completed).
+- Tabs open/close and keep the session state running in the background.
+- The turn-phase indicator (routing/thinking) appears and disappears at the right moment.
+- The `AskUserQuestion` modal sends the right answer via `updatedInput`.
+- The routing/bypass toggle in the Sidebar reflects in the actual behavior of the next message.
+- The read-only terminal (`CommandsPanel`) shows `!cmd` and Task tabs without accepting input.
 
-## Limitação atual
+## Current limitation
 
-Sem suíte automatizada, regressões em fluxo de UI só aparecem no teste manual do usuário — ao tocar em código compartilhado (`shared/src/index.ts`, `hub.ts`, `reduce.ts`), o cuidado extra em revisão de diff substitui a rede de segurança que testes dariam.
+Without an automated suite, UI flow regressions only surface during the user's manual testing — when touching shared code (`shared/src/index.ts`, `hub.ts`, `reduce.ts`), extra care in diff review replaces the safety net that tests would otherwise give.

@@ -1,86 +1,88 @@
 # Claude Code UI
 
-Web app pra rodar e conversar com sessões do [Claude Code](https://claude.com/claude-code) direto do browser — sem abrir terminal. Suporta projetos locais e remotos (via SSH), múltiplas sessões em abas, e roteamento automático entre modelos Haiku/Sonnet por mensagem.
+Web app to run and chat with [Claude Code](https://claude.com/claude-code) sessions straight from the browser — no terminal required. Supports local and remote (SSH) projects, multiple sessions in tabs, and automatic Haiku/Sonnet model routing per message.
 
-## Por que
+## Why
 
-Terminal é ótimo pra codar, ruim pra acompanhar várias sessões de Claude Code ao mesmo tempo, revisar histórico, ou operar de um servidor remoto sem ficar com uma aba SSH aberta o dia todo. Esse projeto resolve isso: uma interface web fina em cima do [Claude Agent SDK](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk), com o backend rodando local (loopback only) e o browser como cliente.
+The terminal is great for coding, not so great for tracking several Claude Code sessions at once, reviewing history, or operating a remote server without keeping an SSH tab open all day. This project fixes that: a thin web interface on top of the [Claude Agent SDK](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk), backend running locally (loopback only) with the browser as the client.
 
 ## Features
 
-- **Chat com Claude** — streaming de resposta, markdown renderizado (GFM + syntax highlight), custo/tokens por turno.
-- **Múltiplas sessões/abas** — cada sessão continua rodando em background mesmo com a aba fechada.
-- **Projetos locais e remotos (SSH)** — abre sessões `claude` num host remoto como se fosse local; sobrevive a queda de conexão SSH (o processo remoto termina o turno sozinho, e a UI reconecta e re-sincroniza o histórico).
-- **Model Routing** — por mensagem, decide entre Haiku (rápido/barato) e Sonnet (mais capaz) com heurística de texto + fallback via classificador Haiku descartável, com escalação automática no meio do turno quando a tarefa fica mais complexa do que o esperado. Opt-in por projeto — desligado, roda no modelo fixo configurado, sem overhead nenhum.
-- **Terminal read-only** — mostra os comandos rodados (`!cmd`) e o log de subagentes (Task tool), mas não aceita input direto: aprovação de permissão nunca é contornada.
-- **Slash commands com autocomplete**, **busca/tags/favoritos/arquivamento** de sessões, **barra de status do Git**, **temas** (light/dark/system), **notificações do browser**, **atalhos de teclado** e **command palette** (`Ctrl/Cmd+K`).
-- **Permission bypass** por projeto, com confirmação explícita — pra quem quer rodar sem aprovação manual em ambientes de confiança.
+- **Chat with Claude** — streaming responses, rendered markdown (GFM + syntax highlight), cost/tokens per turn.
+- **Multiple sessions/tabs** — each session keeps running in the background even with the tab closed.
+- **Local and remote (SSH) projects** — opens `claude` sessions on a remote host as if it were local; survives SSH drops (the remote process finishes the turn on its own, and the UI reconnects and re-syncs history).
+- **Model Routing** — per message, decides between Haiku (fast/cheap) and Sonnet (more capable) via a text heuristic plus a disposable Haiku classifier fallback, with automatic mid-turn escalation when a task turns out more complex than expected. Opt-in per project — when off, it runs on the fixed configured model with zero overhead.
+- **Read-only terminal** — shows commands run (`!cmd`) and subagent logs (Task tool), but never accepts direct input: permission approval is never bypassed.
+- **Slash commands with autocomplete**, **search/tags/favorites/archiving** for sessions, **Git status bar**, **themes** (light/dark/system), **browser notifications**, **keyboard shortcuts**, and a **command palette** (`Ctrl/Cmd+K`).
+- **Permission bypass** per project, with explicit confirmation — for anyone who wants to run without manual approval in trusted environments.
 
-Só usa `haiku` e `sonnet` — Opus e Fable ficam bloqueados por design (custo), enforçado no backend em toda resposta do modelo, não só na configuração inicial.
+Only `haiku` and `sonnet` are used — Opus and Fable are blocked by design (cost), enforced on the backend on every model response, not just at initial config.
 
 ## Stack
 
-| Camada | Tecnologia |
+| Layer | Technology |
 |---|---|
-| Frontend | React 19 + Vite + Tailwind 4, estado em Zustand |
+| Frontend | React 19 + Vite + Tailwind 4, state in Zustand |
 | Backend | Node.js + Hono + WebSocket (`ws`) |
-| Orquestração | `@anthropic-ai/claude-agent-sdk` |
-| Tipos compartilhados | workspace `shared` (`@ccui/shared`) — mesmo contrato de protocolo pros dois lados |
-| Linguagem | TypeScript estrito, sem `any`, 3 workspaces via npm workspaces |
+| Orchestration | `@anthropic-ai/claude-agent-sdk` |
+| Shared types | `shared` workspace (`@ccui/shared`) — same protocol contract on both sides |
+| Language | Strict TypeScript, no `any`, 3 workspaces via npm workspaces |
 
-Sem framework de state machine, sem ORM, sem camadas de Controller/Service — cada arquivo tem uma responsabilidade direta.
+No state-machine framework, no ORM, no Controller/Service layers — each file has one direct responsibility.
 
-## Estrutura
+## Structure
 
 ```
-web/     → SPA React (chat, tabs, sidebar, terminal read-only, temas)
-server/  → API Hono + WebSocket + runtime do Agent SDK (local e SSH)
-shared/  → tipos e protocolo de eventos WebSocket usados pelos dois lados
-docs/    → documentação de arquitetura/frontend/backend/testes
+web/     -> React SPA (chat, tabs, sidebar, read-only terminal, themes)
+server/  -> Hono API + WebSocket + Agent SDK runtime (local and SSH)
+shared/  -> types and WebSocket event protocol used by both sides
+docs/    -> architecture/frontend/backend/testing documentation
 ```
 
-Documentação técnica completa em [`docs/architecture.md`](docs/architecture.md), [`docs/frontend.md`](docs/frontend.md), [`docs/backend.md`](docs/backend.md) e [`docs/testing.md`](docs/testing.md). Regras e convenções do projeto (pra humano ou IA) em [`CLAUDE.md`](CLAUDE.md).
+Full technical documentation lives in [`docs/architecture.md`](docs/architecture.md), [`docs/frontend.md`](docs/frontend.md), [`docs/backend.md`](docs/backend.md), and [`docs/testing.md`](docs/testing.md). Project rules and conventions (for humans or AI) live in [`CLAUDE.md`](CLAUDE.md).
 
-## Como rodar
+**All project documentation, code, comments, and commits are in English.**
 
-Requer Node.js e o binário `claude` instalado (`npm install -g @anthropic-ai/claude-code` ou equivalente).
+## Running it
+
+Requires Node.js and the `claude` binary installed (`npm install -g @anthropic-ai/claude-code` or equivalent).
 
 ```bash
 npm install
 
-# desenvolvimento (2 terminais)
-npm run dev:server   # backend em watch mode, porta 4317
-npm run dev:web       # Vite dev server do frontend
+# development (2 terminals)
+npm run dev:server   # backend in watch mode, port 4317
+npm run dev:web       # Vite dev server for the frontend
 
-# produção
-npm run build         # builda o frontend pra web/dist
-npm run start         # roda o backend, servindo o frontend estático
+# production
+npm run build         # builds the frontend into web/dist
+npm run start         # runs the backend, serving the static frontend
 ```
 
-O backend abre automaticamente o browser no endereço `http://127.0.0.1:4317/#token=...` — o token é gerado por execução e escuta só em loopback.
+The backend automatically opens the browser at `http://127.0.0.1:4317/#token=...` — the token is generated per run and it only listens on loopback.
 
-Pra reiniciar o app em produção depois de mudar código:
+To restart the app in production after changing code:
 
 ```bash
 ./restart.sh
 ```
 
-## Validação
+## Validation
 
 ```bash
-npm run typecheck   # tsc nos 3 workspaces (shared, server, web)
-npm run build       # confirma que o frontend compila
+npm run typecheck   # tsc across the 3 workspaces (shared, server, web)
+npm run build       # confirms the frontend compiles
 ```
 
-Sem suíte de testes automatizada por escolha do projeto (ver [`docs/testing.md`](docs/testing.md)) — validação de UI é manual, no browser.
+No automated test suite by project choice (see [`docs/testing.md`](docs/testing.md)) — UI validation is manual, in the browser.
 
-## Segurança
+## Security
 
-- Backend só escuta em `127.0.0.1`/`localhost` (recusa qualquer outro host).
-- Token de autenticação por execução, exigido em toda conexão WebSocket/API.
-- Bypass de permissão é opt-in explícito por projeto, nunca default.
-- Allowlist de modelo (`haiku`/`sonnet`) é checada tanto na abertura da sessão quanto em cada resposta do SDK — defesa em profundidade contra troca de modelo em runtime.
+- Backend only listens on `127.0.0.1`/`localhost` (rejects any other host).
+- Per-run auth token, required on every WebSocket/API connection.
+- Permission bypass is explicit opt-in per project, never default.
+- Model allowlist (`haiku`/`sonnet`) is checked both when opening a session and on every SDK response — defense in depth against a runtime model switch.
 
 ## Status
 
-Fases 1 (local), 2 (SSH), 3 (markdown/tabs/busca/tema/git/shortcuts) e 5 (terminal com subagentes) implementadas e com typecheck passando. Histórico de design/decisões de cada feature em `docs/superpowers/{specs,plans}/`.
+Phases 1 (local), 2 (SSH), 3 (markdown/tabs/search/theme/git/shortcuts), and 5 (subagent terminal) are implemented with typecheck passing. Design/decision history for each feature lives in `docs/superpowers/{specs,plans}/`.

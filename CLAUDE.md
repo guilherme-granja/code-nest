@@ -1,60 +1,63 @@
 # Claude Code UI
 
-Web app pra rodar sessões do Claude Code no browser em vez do terminal: chat, múltiplas abas/sessões, projetos locais e remotos via SSH, Model Routing (Haiku/Sonnet por mensagem).
+Web app to run Claude Code sessions in the browser instead of the terminal: chat, multiple tabs/sessions, local and remote projects via SSH, Model Routing (per-message Haiku/Sonnet).
+
+**All code, comments, commits, and documentation in this project are written in English. Always.**
 
 ## Stack
 
 - Frontend: React + Vite + Tailwind, workspace `web`
 - Backend: Node.js + Hono + WebSocket, workspace `server`
-- Tipos compartilhados: workspace `shared` (`@ccui/shared`)
-- Orquestração de sessões: `@anthropic-ai/claude-agent-sdk`
-- TypeScript strict em todos os workspaces (npm workspaces, sem monorepo tool)
+- Shared types: workspace `shared` (`@ccui/shared`)
+- Session orchestration: `@anthropic-ai/claude-agent-sdk`
+- Strict TypeScript across all workspaces (npm workspaces, no monorepo tool)
 
 ## Structure
 
-- `web/src/` — UI React (componentes em `features/*`, estado em `store.ts`, WS client em `ws.ts`)
-- `server/src/` — API Hono + WebSocket + runtime do Agent SDK (`hub.ts`, `domain.ts`, `runtime/`)
-- `shared/src/` — tipos e protocolo de eventos WebSocket compartilhados entre os dois
-- `docs/` — documentação operacional (este repo) + `docs/superpowers/{specs,plans}/` (specs/planos históricos de feature)
+- `web/src/` — React UI (components in `features/*`, state in `store.ts`, WS client in `ws.ts`)
+- `server/src/` — Hono API + WebSocket + Agent SDK runtime (`hub.ts`, `domain.ts`, `runtime/`)
+- `shared/src/` — types and WebSocket event protocol shared between both sides
+- `docs/` — operational documentation (this repo) + `docs/superpowers/{specs,plans}/` (historical feature specs/plans)
 
 ## Important Rules
 
-- Preservar padrões existentes; reusar abstrações já presentes (`Transport`, `ClaudeRuntime`, `OpenOptions`, `LiveSession`, `SessionHub`) em vez de criar camadas novas.
-- Não duplicar lógica; não introduzir Controller/Service/Repository — o projeto não usa essas camadas.
-- Mudança focada: sem refactor não relacionado, sem trocar dependência sem necessidade, sem tocar em `web/dist` (gerado) ou `node_modules`.
-- **Nunca usar Opus ou Fable**, em nenhum modelo/config/sugestão. Só `haiku`/`sonnet` (ver `MODELS` em `shared/src/index.ts`, e a checagem `forbiddenModel` em `server/src/runtime/sdk-runtime.ts:43`).
-- Preservar as decisões de runtime remoto (SSH) já confirmadas — ver `docs/architecture.md` §Remote/SSH — não substituir por implementação genérica sem verificar o código primeiro.
-- Ausência de testes automatizados e de `git init` é decisão explícita do projeto, não pendência. Não sugerir adicionar sem o usuário pedir.
+- Preserve existing patterns; reuse existing abstractions (`Transport`, `ClaudeRuntime`, `OpenOptions`, `LiveSession`, `SessionHub`) instead of creating new layers.
+- Don't duplicate logic; don't introduce Controller/Service/Repository — the project doesn't use those layers.
+- Focused changes: no unrelated refactors, no swapping dependencies without need, don't touch `web/dist` (generated) or `node_modules`.
+- **Never use Opus or Fable**, in any model/config/suggestion. Only `haiku`/`sonnet` (see `MODELS` in `shared/src/index.ts`, and the `forbiddenModel` check in `server/src/runtime/sdk-runtime.ts:43`).
+- Preserve the already-confirmed remote runtime (SSH) decisions — see `docs/architecture.md` §Remote/SSH — don't replace with a generic implementation without checking the code first.
+- No automated tests and no prior git history before 2026-09-22 was an explicit project decision, not something pending. Don't suggest adding tests unless the user asks.
+- Write everything — code, comments, commit messages, docs — in English, never Portuguese.
 
 ## Before changing code
 
-1. Identificar os arquivos reais envolvidos (grep pelo símbolo/evento, não adivinhar caminho).
-2. Checar `docs/architecture.md`, `docs/frontend.md` ou `docs/backend.md` conforme a área; se precisar de histórico/decisão de feature específica, procurar em `docs/superpowers/specs/` ou `.../plans/` pelo nome da feature.
-3. Verificar o padrão já usado no arquivo/módulo vizinho antes de escrever algo novo.
-4. Implementar a menor mudança que resolve o pedido.
-5. Validar com os comandos reais (seção abaixo).
+1. Identify the actual files involved (grep the symbol/event name, don't guess the path).
+2. Check `docs/architecture.md`, `docs/frontend.md`, or `docs/backend.md` depending on the area; for feature-specific history/decisions, search `docs/superpowers/specs/` or `.../plans/` by feature name.
+3. Check the pattern already used in the neighboring file/module before writing something new.
+4. Implement the smallest change that resolves the request.
+5. Validate with the real commands (section below).
 
 ## Validation
 
-- `npm run typecheck` — roda `tsc -p shared && tsc -p server && tsc -p web`
-- `npm run build` — build do frontend (`web`)
-- `npm run dev:server` / `npm run dev:web` — dev local
-- `./restart.sh` — mata backend antigo via PID do lock (`~/.claude-code-ui/lock`), builda e sobe de novo
-- Não existe script de lint nem de teste automatizado no `package.json` — não invente `npm test`/`npm run lint`.
+- `npm run typecheck` — runs `tsc -p shared && tsc -p server && tsc -p web`
+- `npm run build` — builds the frontend (`web`)
+- `npm run dev:server` / `npm run dev:web` — local dev
+- `./restart.sh` — kills the old backend via the lock PID (`~/.claude-code-ui/lock`), builds, and starts it again
+- There is no lint or automated test script in `package.json` — don't invent `npm test`/`npm run lint`.
 
 ## Context Efficiency
 
-- Não escanear o repo inteiro; começar pelo arquivo/módulo que a tarefa cita.
-- Buscas direcionadas (grep pelo nome do símbolo/evento) em vez de ler tudo.
-- Ler só a parte relevante de arquivos grandes; seguir imports/usages apenas quando necessário pra tarefa.
-- Nunca ler `node_modules`, `web/dist`, caches ou logs.
-- Nunca carregar `docs/superpowers/` inteiro — abrir só o spec/plan cujo nome bate com a feature da tarefa.
-- Não carregar todos os `docs/*.md` numa tarefa que só toca uma área (frontend OU backend, não os dois por hábito).
+- Don't scan the whole repo; start from the file/module the task names.
+- Targeted searches (grep the symbol/event name) instead of reading everything.
+- Read only the relevant part of large files; follow imports/usages only when the task needs it.
+- Never read `node_modules`, `web/dist`, caches, or logs.
+- Never load all of `docs/superpowers/` — open only the spec/plan whose name matches the task's feature.
+- Don't load every `docs/*.md` for a task that only touches one area (frontend OR backend, not both out of habit).
 
 ## Documentation
 
-- `docs/architecture.md` — visão geral, runtime (local/SSH), protocolo WebSocket, Model Routing. Ler antes de mudar fluxo entre frontend/backend ou runtime.
-- `docs/frontend.md` — estrutura de `web/src`, estado, padrões de componente. Ler antes de tocar UI.
-- `docs/backend.md` — estrutura de `server/src`, SessionHub, transports, SDK. Ler antes de tocar backend/runtime.
-- `docs/testing.md` — estado real de validação (sem testes automatizados) e o que checar manualmente.
-- `docs/superpowers/specs/` e `.../plans/` — specs e planos detalhados por feature; consultar só a spec/plan relevante quando precisar de profundidade/histórico, nunca como leitura geral.
+- `docs/architecture.md` — overview, runtime (local/SSH), WebSocket protocol, Model Routing. Read before changing flow between frontend/backend or the runtime.
+- `docs/frontend.md` — structure of `web/src`, state, component patterns. Read before touching the UI.
+- `docs/backend.md` — structure of `server/src`, SessionHub, transports, SDK. Read before touching backend/runtime.
+- `docs/testing.md` — real validation state (no automated tests) and what to check manually.
+- `docs/superpowers/specs/` and `.../plans/` — detailed specs and plans per feature; consult only the relevant one when depth/history is needed, never as general reading.

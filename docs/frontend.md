@@ -1,65 +1,65 @@
 # Frontend (`web/`)
 
-React + Vite + Tailwind, TypeScript strict. Sem router SPA — layout único (Sidebar + Tabs + Chat) controlado por estado global.
+React + Vite + Tailwind, strict TypeScript. No SPA router — a single layout (Sidebar + Tabs + Chat) driven by global state.
 
-## Estrutura (`web/src/`)
+## Structure (`web/src/`)
 
 ```
-app/App.tsx          entry visual, keybindings globais
-main.tsx              boot React
-store.ts              estado global (Zustand) + ciclo de vida do WebSocket
-ws.ts                 client WS (auto-reconnect)
-api.ts                client HTTP + token
-notify.ts             Notification API (opt-in, nunca mostra conteúdo de mensagem)
-theme.ts              tema light/dark/system (fora do React, localStorage)
-features/chat/        Chat, reduce.ts (reducer de eventos), Markdown, GitBar, CommandsPanel,
+app/App.tsx          visual entry point, global keybindings
+main.tsx              React boot
+store.ts              global state (Zustand) + WebSocket lifecycle
+ws.ts                 WS client (auto-reconnect)
+api.ts                HTTP client + token
+notify.ts             Notification API (opt-in, never shows message content)
+theme.ts              light/dark/system theme (outside React, localStorage)
+features/chat/        Chat, reduce.ts (event reducer), Markdown, GitBar, CommandsPanel,
                        ShellCard, SlashMenu, ToolCard, AskUserQuestionModal
-features/sessions/    Tabs, Palette (Ctrl+K), Shortcuts (modal ?), NewSessionModal
-features/projects/    Sidebar (projetos, toggle routing/bypass)
-features/connect/     ConnectScreen, ServerForm (setup inicial de conexão)
-lib/                  commands.ts (busca de slash-commands), format.ts (fmtTokens etc.),
-                       search.ts (normalização/matchRow)
+features/sessions/    Tabs, Palette (Ctrl+K), Shortcuts (? modal), NewSessionModal
+features/projects/    Sidebar (projects, routing/bypass toggles)
+features/connect/     ConnectScreen, ServerForm (initial connection setup)
+lib/                  commands.ts (slash-command search), format.ts (fmtTokens etc.),
+                       search.ts (normalization/matchRow)
 ```
 
-## Estado (`store.ts`)
+## State (`store.ts`)
 
-Zustand, uma store global (`useApp`, hook único — não há hooks locais por feature). Guarda: config, projects, `tabs`, `chats` (por `sessionId`), estado de UI (palette/help/newSession/terminal). WebSocket é criado dentro de `start()` e reanexado em reconexão. Preferências de layout (sidebar visível, grupos colapsados) persistem em `localStorage` sob prefixo `ccui-`.
+Zustand, a single global store (`useApp`, the only hook — no per-feature local hooks). Holds: config, projects, `tabs`, `chats` (per `sessionId`), UI state (palette/help/newSession/terminal). The WebSocket is created inside `start()` and reattached on reconnect. Layout preferences (sidebar visibility, collapsed groups) persist in `localStorage` under the `ccui-` prefix.
 
-Ações principais: `open()`, `closeTab()`, `send()`, `interrupt()`, `answer()`, `shell()`.
+Main actions: `open()`, `closeTab()`, `send()`, `interrupt()`, `answer()`, `shell()`.
 
 ## WebSocket
 
-`ws.ts`: `createSocket(handlers)` conecta em `/ws`, autentica com `{ type:'auth', token }`, reconecta com backoff exponencial (500ms–5s).
+`ws.ts`: `createSocket(handlers)` connects to `/ws`, authenticates with `{ type:'auth', token }`, reconnects with exponential backoff (500ms-5s).
 
-`store.ts` (handler de mensagem) despacha `snapshot` (hidrata via `applySnapshot`) e `event` (via `applyEvent`, ambos em `features/chat/reduce.ts` — reducer puro, mesma forma de `Chat`/`Item` usada em toda a UI de chat).
+`store.ts` (the message handler) dispatches `snapshot` (hydrated via `applySnapshot`) and `event` (via `applyEvent`, both in `features/chat/reduce.ts` — a pure reducer, the same `Chat`/`Item` shape used across the whole chat UI).
 
-`answer(reqId, allow, updatedInput?)` envia `{ type:'permission', sessionId, reqId, allow, updatedInput }` — usado tanto pra permissão normal quanto pro modal `AskUserQuestion`.
+`answer(reqId, allow, updatedInput?)` sends `{ type:'permission', sessionId, reqId, allow, updatedInput }` — used both for normal permission approval and for the `AskUserQuestion` modal.
 
 ## Model Routing UI
 
-`reduce.ts`: campo `turnPhase: 'idle' | 'routing' | 'thinking'` no `Chat`. `routing.started` → `routing`; `model.routed` → `thinking` (guarda `pendingRoutedModel`, anexado na próxima mensagem do usuário como `Item.routedModel`); qualquer evento de conteúdo real volta pra `idle`. `Chat.tsx` renderiza `TurnLoading` (dots animados + timer) com label diferente por fase.
+`reduce.ts`: a `turnPhase: 'idle' | 'routing' | 'thinking'` field on `Chat`. `routing.started` -> `routing`; `model.routed` -> `thinking` (stores `pendingRoutedModel`, attached to the user's next message as `Item.routedModel`); any real content event goes back to `idle`. `Chat.tsx` renders `TurnLoading` (animated dots + timer) with a different label per phase.
 
-## Padrões / pontos de extensão
+## Patterns / extension points
 
-- **Componentes**: `PascalCase`, função exportada (ou `memo()` quando re-render é caro, ex. `Markdown`).
-- **Reducer de chat**: mudanças no protocolo de eventos entram em `features/chat/reduce.ts` (`applyEvent`) — é o único lugar que traduz `EventBody` → `Item`/`Chat`. Não duplicar essa lógica em componentes.
-- **Tipos**: sempre importados de `@ccui/shared`, nunca duplicados localmente.
-- **Storage keys**: prefixo `ccui-` (`ccui-theme`, `ccui-notify`, layout).
-- **Busca/filtro**: `lib/search.ts` (`norm` + `matchRow`) é reusado por `Palette` e pela lista de sessões — não reimplementar normalização de texto em outro componente.
+- **Components**: `PascalCase`, exported function (or `memo()` when re-render is expensive, e.g. `Markdown`).
+- **Chat reducer**: protocol changes to events go into `features/chat/reduce.ts` (`applyEvent`) — the only place that translates `EventBody` -> `Item`/`Chat`. Don't duplicate that logic in components.
+- **Types**: always imported from `@ccui/shared`, never duplicated locally.
+- **Storage keys**: `ccui-` prefix (`ccui-theme`, `ccui-notify`, layout).
+- **Search/filter**: `lib/search.ts` (`norm` + `matchRow`) is reused by `Palette` and the session list — don't reimplement text normalization in another component.
 
-## Componentes notáveis
+## Notable components
 
-| Feature | Arquivo | Nota |
+| Feature | File | Note |
 |---|---|---|
-| Markdown | `features/chat/Markdown.tsx` | `react-markdown` + `remark-gfm` + `rehype-highlight`, memoizado (evita re-render a cada delta de streaming) |
-| Tabs | `features/sessions/Tabs.tsx` | cor do dot = estado da sessão (amber=awaiting_permission, azul pulsando=running, verde=evento novo, cinza=idle) |
-| Git bar | `features/chat/GitBar.tsx` | busca `/api/projects/{id}/git`, atualiza ao fim do turno |
-| Terminal read-only | `features/chat/CommandsPanel.tsx` | mostra comandos `!` e tabs por Task (subagente) ativo; não aceita input — decisão deliberada, ver `docs/architecture.md` |
-| Slash autocomplete | `features/chat/SlashMenu.tsx` | ranking: prefixo > alias > nome contém > descrição contém, máx 40 itens |
-| Bypass permissions | `features/projects/Sidebar.tsx` | toggle por projeto com confirmação, badge vermelho quando ativo |
-| Modal AskUserQuestion | `features/chat/AskUserQuestionModal.tsx` | single/multi-select + texto livre, resposta via `updatedInput` |
-| Command palette | `features/sessions/Palette.tsx` | Ctrl/Cmd+K, busca sessões + ações globais (nova sessão, tema, sidebar, terminal) |
+| Markdown | `features/chat/Markdown.tsx` | `react-markdown` + `remark-gfm` + `rehype-highlight`, memoized (avoids re-render on every streaming delta) |
+| Tabs | `features/sessions/Tabs.tsx` | dot color = session state (amber=awaiting_permission, pulsing blue=running, green=new event, gray=idle) |
+| Git bar | `features/chat/GitBar.tsx` | fetches `/api/projects/{id}/git`, refreshes at the end of each turn |
+| Read-only terminal | `features/chat/CommandsPanel.tsx` | shows `!` commands and per-Task (subagent) tabs; doesn't accept input — a deliberate decision, see `docs/architecture.md` |
+| Slash autocomplete | `features/chat/SlashMenu.tsx` | ranking: prefix > alias > name contains > description contains, max 40 items |
+| Bypass permissions | `features/projects/Sidebar.tsx` | per-project toggle with confirmation, red badge when active |
+| AskUserQuestion modal | `features/chat/AskUserQuestionModal.tsx` | single/multi-select + free text, answer sent via `updatedInput` |
+| Command palette | `features/sessions/Palette.tsx` | Ctrl/Cmd+K, searches sessions + global actions (new session, theme, sidebar, terminal) |
 
-## Atalhos globais
+## Global shortcuts
 
-Definidos em `app/App.tsx`: Ctrl/Cmd+K (palette), Alt+N (nova sessão), Alt+L (sidebar), Alt+↑↓ (trocar tab), Ctrl+J (terminal), `?` (ajuda), Esc (fechar modal). Lista completa e atualizável em `features/sessions/Shortcuts.tsx`.
+Defined in `app/App.tsx`: Ctrl/Cmd+K (palette), Alt+N (new session), Alt+L (sidebar), Alt+Up/Down (switch tab), Ctrl+J (terminal), `?` (help), Esc (close modal). Full, up-to-date list in `features/sessions/Shortcuts.tsx`.

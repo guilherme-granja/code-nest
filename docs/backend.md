@@ -1,63 +1,63 @@
 # Backend (`server/`)
 
-Node.js + Hono + WebSocket. Sem Controller/Service/Repository — módulos são arquivos por responsabilidade em `server/src/`.
+Node.js + Hono + WebSocket. No Controller/Service/Repository — modules are files organized by responsibility under `server/src/`.
 
 ## File map
 
-- `index.ts` — entry point: `openStore()`, `Connections`, `SessionHub`, Hono app (`/api` + estáticos de `web/dist`), `attachWs`, shutdown gracioso em SIGINT/SIGTERM.
-- `hub.ts` — `SessionHub`: coordena estado por sessão, buffer de eventos pra replay, ponte WebSocket↔runtime. Ver `docs/architecture.md` pro fluxo completo.
-- `domain.ts` — `openSpecFor()` monta o `OpenSpec` (hierarquia session→project→config), `ensureMeta`, `touch`, `listProjectSessions`, `connectionIdFor`.
-- `store.ts` — `JsonFile<T>` (leitura/escrita atômica com `.bak`), `openStore()` carrega `config.json`/`projects.json`/`sessions.json`, `acquireLock()` — um backend por `DATA_DIR` via `~/.claude-code-ui/lock` (PID).
-- `connections.ts` — `Connections`: runtimes ativos (local + SSH configuradas), monitora status SSH periodicamente.
-- `ws.ts` — `attachWs`: handshake de auth por token, dispatch de mensagens cliente (`send`, `permission`, `shell`, `interrupt`, `attach`).
-- `routes.ts` — API REST (`/api/projects`, `/api/sessions`, etc.).
-- `security.ts` — `guard` (checagem de token/host), `makeToken`.
-- `ssh-util.ts` — helpers SSH: `claudeExpr`, `encodeCwd`, `explainSshError`, `runSsh`, `shq` (shell-quote), `sshArgv`, `SESSION_ID_RE`.
-- `commands.ts` — `visibleCommands` (filtra slash-commands do SDK pros permitidos na UI, ex.: bloqueia `/model` headless).
-- `git.ts` — parse de `git status --porcelain=v2 --branch` pra `GitInfo`.
+- `index.ts` — entry point: `openStore()`, `Connections`, `SessionHub`, Hono app (`/api` + static files from `web/dist`), `attachWs`, graceful shutdown on SIGINT/SIGTERM.
+- `hub.ts` — `SessionHub`: coordinates per-session state, event buffer for replay, WebSocket<->runtime bridge. See `docs/architecture.md` for the full flow.
+- `domain.ts` — `openSpecFor()` builds the `OpenSpec` (session->project->config hierarchy), `ensureMeta`, `touch`, `listProjectSessions`, `connectionIdFor`.
+- `store.ts` — `JsonFile<T>` (atomic read/write with `.bak`), `openStore()` loads `config.json`/`projects.json`/`sessions.json`, `acquireLock()` — one backend per `DATA_DIR` via `~/.claude-code-ui/lock` (PID).
+- `connections.ts` — `Connections`: active runtimes (local + configured SSH connections), periodically monitors SSH status.
+- `ws.ts` — `attachWs`: token-based auth handshake, dispatches client messages (`send`, `permission`, `shell`, `interrupt`, `attach`).
+- `routes.ts` — REST API (`/api/projects`, `/api/sessions`, etc.).
+- `security.ts` — `guard` (token/host check), `makeToken`.
+- `ssh-util.ts` — SSH helpers: `claudeExpr`, `encodeCwd`, `explainSshError`, `runSsh`, `shq` (shell-quote), `sshArgv`, `SESSION_ID_RE`.
+- `commands.ts` — `visibleCommands` (filters SDK slash-commands down to what the UI allows, e.g. blocks `/model` in headless mode).
+- `git.ts` — parses `git status --porcelain=v2 --branch` into `GitInfo`.
 
 ### `runtime/`
 
-- `types.ts` — interfaces `Transport`, `OpenOptions`, `LiveSession`, `ClaudeRuntime` (ver `docs/architecture.md`).
-- `sdk-runtime.ts` — `SdkRuntime` (única implementação de `ClaudeRuntime`) + classe interna `Live` (`LiveSession`). Usa `@anthropic-ai/claude-agent-sdk`: `query()`, `tool()`, `createSdkMcpServer()`, `canUseTool`. Contém `forbiddenModel`, classificador (`classify`/`classifyViaHaiku`), MCP server de escalação de routing.
-- `local-transport.ts` — `Transport` local (spawna `claude` direto), `reportOrphans()`.
-- `ssh-transport.ts` — `Transport` via SSH (`sshTransport(conn)`), ver decisões em `docs/architecture.md` §Remote/SSH.
-- `child.ts` — `spawnManaged` (processo detached, grupo próprio, kill em cascata), `run.json` (registro de PIDs pra aviso de órfão, não é lock).
-- `events.ts` — `mapMessage()`: traduz mensagens do SDK pra `EventBody` do protocolo.
-- `routing.ts` — `classifyHeuristic`, `CLASSIFY_SYSTEM_PROMPT` (ver Model Routing em `docs/architecture.md`).
-- `jsonl.ts` — parse do jsonl do Claude Code: `parseHistory`, `firstPrompt`, `lastCostState`.
+- `types.ts` — the `Transport`, `OpenOptions`, `LiveSession`, `ClaudeRuntime` interfaces (see `docs/architecture.md`).
+- `sdk-runtime.ts` — `SdkRuntime` (the single `ClaudeRuntime` implementation) + the internal `Live` class (`LiveSession`). Uses `@anthropic-ai/claude-agent-sdk`: `query()`, `tool()`, `createSdkMcpServer()`, `canUseTool`. Contains `forbiddenModel`, the classifier (`classify`/`classifyViaHaiku`), and the routing escalation MCP server.
+- `local-transport.ts` — the local `Transport` (spawns `claude` directly), `reportOrphans()`.
+- `ssh-transport.ts` — the SSH `Transport` (`sshTransport(conn)`), see decisions in `docs/architecture.md` §Remote/SSH.
+- `child.ts` — `spawnManaged` (detached process, own process group, cascading kill), `run.json` (PID registry for orphan warnings, not a lock).
+- `events.ts` — `mapMessage()`: translates SDK messages into the protocol's `EventBody`.
+- `routing.ts` — `classifyHeuristic`, `CLASSIFY_SYSTEM_PROMPT` (see Model Routing in `docs/architecture.md`).
+- `jsonl.ts` — parses the Claude Code jsonl: `parseHistory`, `firstPrompt`, `lastCostState`.
 
 ## SessionHub
 
-`send(id, text)` (`hub.ts:86`): reserva estado `running` antes do `await` de abrir sessão (evita processo duplicado); se `spec.routing`, emite `routing.started` → `runtime.classify()` → `live.setModel()` → emite `model.routed`; sempre emite `user.message` e chama `live.send(text)`.
+`send(id, text)` (`hub.ts:86`): reserves the `running` state before the `await` of opening the session (avoids a duplicate process); if `spec.routing`, emits `routing.started` -> `runtime.classify()` -> `live.setModel()` -> emits `model.routed`; always emits `user.message` and calls `live.send(text)`.
 
-`answerPermission(id, reqId, allow, updatedInput?)` — repassa pro `live.answerPermission`, mesmo canal usado por aprovação normal de tool e pelas respostas do `AskUserQuestion`.
+`answerPermission(id, reqId, allow, updatedInput?)` — forwards to `live.answerPermission`, the same channel used both for normal tool approval and for `AskUserQuestion` answers.
 
-`recover(id, e)` (`hub.ts:141`) — chamado quando o processo cai (`error/exit`); espera `runtime.settle()` (que usa `waitSessionIdle`) e reenvia snapshot pra todos os clientes conectados.
+`recover(id, e)` (`hub.ts:141`) — called when the process dies (`error/exit`); waits on `runtime.settle()` (which uses `waitSessionIdle`) and resends the snapshot to every connected client.
 
 ## SSH
 
-Ver `docs/architecture.md` §Remote/SSH — fatos confirmados no código, não reimplementar de forma genérica sem checar `ssh-transport.ts`/`ssh-util.ts` primeiro.
+See `docs/architecture.md` §Remote/SSH — facts confirmed in code, don't reimplement generically without checking `ssh-transport.ts`/`ssh-util.ts` first.
 
 ## Model Routing
 
-Implementação dividida em `routing.ts` (heurística + prompt de classificação) e `sdk-runtime.ts` (`classify`, `classifyViaHaiku`, MCP tool `request_model_upgrade`). Toggle lido em `domain.ts:16` (`project.routing ?? false`). Detalhe completo em `docs/architecture.md` §Model Routing.
+Split between `routing.ts` (heuristic + classification prompt) and `sdk-runtime.ts` (`classify`, `classifyViaHaiku`, the `request_model_upgrade` MCP tool). Toggle read in `domain.ts:16` (`project.routing ?? false`). Full detail in `docs/architecture.md` §Model Routing.
 
-## Configuração
+## Configuration
 
-- Store em `~/.claude-code-ui/{config,projects,sessions}.json` (ou `CCUI_DATA_DIR`), escrita atômica com backup `.bak` (`store.ts:26`).
-- Hierarquia de config: `SessionMeta.model/effort` (por sessão) → `Project.model/effort/routing/bypass/lean` (por projeto) → `Config.defaults` (global, `model:'sonnet', effort:'medium', maxBudgetUsd:2`).
-- `permissionMode`: `default | plan | bypassPermissions`, derivado de `project.bypass` em `domain.ts:18`.
+- Store lives at `~/.claude-code-ui/{config,projects,sessions}.json` (or `CCUI_DATA_DIR`), atomic writes with `.bak` backup (`store.ts:26`).
+- Config hierarchy: `SessionMeta.model/effort` (per session) -> `Project.model/effort/routing/bypass/lean` (per project) -> `Config.defaults` (global, `model:'sonnet', effort:'medium', maxBudgetUsd:2`).
+- `permissionMode`: `default | plan | bypassPermissions`, derived from `project.bypass` in `domain.ts:18`.
 
-## Tratamento de erros
+## Error handling
 
-- Timeout de permissão: 10 min (`PERMISSION_TIMEOUT_MS`, `sdk-runtime.ts:10`) → nega automaticamente.
-- Timeout de classificação: 15s (`CLASSIFY_TIMEOUT_MS`) → assume `sonnet`.
-- Modelo proibido detectado em qualquer mensagem do SDK → emite `error` e encerra a sessão (`sdk-runtime.ts:115-119`).
-- Erros de SSH têm mensagem amigável via `explainSshError()` (`ssh-util.ts`).
-- Órfãos de processo (`claude`/`ssh` de um backend anterior que não saiu limpo) são só reportados no log (`reportOrphans`), nunca matados automaticamente.
+- Permission timeout: 10 min (`PERMISSION_TIMEOUT_MS`, `sdk-runtime.ts:10`) -> auto-denies.
+- Classification timeout: 15s (`CLASSIFY_TIMEOUT_MS`) -> assumes `sonnet`.
+- A forbidden model detected in any SDK message -> emits `error` and closes the session (`sdk-runtime.ts:115-119`).
+- SSH errors get a friendly message via `explainSshError()` (`ssh-util.ts`).
+- Orphaned processes (`claude`/`ssh` left by a backend that didn't clean up) are only logged (`reportOrphans`), never auto-killed.
 
-## Portas e boot
+## Ports and boot
 
-- Porta padrão `4317` (`CCUI_PORT`), host fixo em loopback (`127.0.0.1`/`localhost`, recusa qualquer outro `CCUI_HOST`).
-- `npm run start` roda `server/src/index.ts` direto com `tsx`; `npm run dev:server` usa `tsx watch` com token/origin de dev fixos.
+- Default port `4317` (`CCUI_PORT`), host fixed to loopback (`127.0.0.1`/`localhost`, refuses any other `CCUI_HOST`).
+- `npm run start` runs `server/src/index.ts` directly with `tsx` (production, serves static `web/dist`); `npm run dev:server` uses `tsx watch` with fixed dev token/origin.

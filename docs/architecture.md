@@ -1,74 +1,74 @@
 # Architecture
 
-## Visão geral
+## Overview
 
-Claude Code UI é um app web (browser) que abre e conversa com sessões do Claude Code, local ou remoto (SSH), via `@anthropic-ai/claude-agent-sdk`. Backend Node (Hono + WebSocket) mantém o estado de cada sessão e faz a ponte entre o SDK e os clientes conectados; frontend React consome eventos via WebSocket e renderiza chat, tabs, terminal read-only etc.
+Claude Code UI is a web app (browser) that opens and talks to Claude Code sessions, local or remote (SSH), via `@anthropic-ai/claude-agent-sdk`. The Node backend (Hono + WebSocket) holds the state of each session and bridges the SDK with connected clients; the React frontend consumes events over WebSocket and renders chat, tabs, the read-only terminal, etc.
 
-## Componentes principais
+## Main components
 
-- **`web`** — SPA React. Consome `/api/*` (HTTP) e `/ws` (WebSocket). Ver `docs/frontend.md`.
-- **`server`** — Hono serve API + estáticos de `web/dist`; `attachWs` liga o WebSocket ao `SessionHub`. Ver `docs/backend.md`.
-- **`shared`** (`@ccui/shared`) — tipos TS e o protocolo de eventos (`EventBody`, `ServerMsg`) usados por `web` e `server`; única fonte de verdade dos formatos de mensagem.
-- **Claude Agent SDK** (`@anthropic-ai/claude-agent-sdk`) — spawna o processo `claude`, expõe `query()`/`Query` (envio de mensagem, `setModel`, `interrupt`, permissões via `canUseTool`). O backend não reimplementa protocolo do Claude Code, só embrulha o SDK.
+- **`web`** — React SPA. Consumes `/api/*` (HTTP) and `/ws` (WebSocket). See `docs/frontend.md`.
+- **`server`** — Hono serves the API + static files from `web/dist`; `attachWs` wires the WebSocket to the `SessionHub`. See `docs/backend.md`.
+- **`shared`** (`@ccui/shared`) — TS types and the event protocol (`EventBody`, `ServerMsg`) used by both `web` and `server`; the single source of truth for message shapes.
+- **Claude Agent SDK** (`@anthropic-ai/claude-agent-sdk`) — spawns the `claude` process, exposes `query()`/`Query` (send message, `setModel`, `interrupt`, permissions via `canUseTool`). The backend doesn't reimplement the Claude Code protocol, it just wraps the SDK.
 
 ## Runtime
 
-Abstração em `server/src/runtime/types.ts`:
+Abstraction in `server/src/runtime/types.ts`:
 
-- `Transport` — tudo que difere entre execução local e remota: `spawn`, `listSessions`, `history`, `usage`, `shell`, `git`, `waitSessionIdle`. Implementações: `local-transport.ts` e `ssh-transport.ts`.
+- `Transport` — everything that differs between local and remote execution: `spawn`, `listSessions`, `history`, `usage`, `shell`, `git`, `waitSessionIdle`. Implementations: `local-transport.ts` and `ssh-transport.ts`.
 - `OpenOptions` — `cwd, sessionId, model, effort, lean, routing, maxBudgetUsd, permissionMode`.
-- `LiveSession` — sessão aberta: `send`, `interrupt`, `answerPermission`, `setModel`, `close`, `events` (AsyncIterable de `EventBody`).
-- `ClaudeRuntime` — fachada usada pelo `SessionHub`: `open`, `listSessions`, `history`, `usage`, `shell`, `commands`, `classify`, `settle`. Implementação única `SdkRuntime` (`sdk-runtime.ts`), parametrizada por `Transport` — local e SSH usam a mesma classe `SdkRuntime`, só o `Transport` muda.
+- `LiveSession` — an open session: `send`, `interrupt`, `answerPermission`, `setModel`, `close`, `events` (AsyncIterable of `EventBody`).
+- `ClaudeRuntime` — the facade used by `SessionHub`: `open`, `listSessions`, `history`, `usage`, `shell`, `commands`, `classify`, `settle`. Single implementation `SdkRuntime` (`sdk-runtime.ts`), parameterized by `Transport` — local and SSH use the same `SdkRuntime` class, only the `Transport` changes.
 
-Fluxo de alto nível de uma mensagem:
+High-level flow for a message:
 
 ```
 SessionHub.send(sessionId, text)
-    ↓ openSpecFor() já resolvido em domain.ts (spec por sessão)
-    ↓ runtime.open(OpenOptions) na 1ª mensagem  → LiveSession
-    ↓ (se spec.routing) runtime.classify() → live.setModel()
-    ↓ live.send(text)
-    ↓ live.events (AsyncIterable<EventBody>) → SessionHub.pump() → emit()
-    ↓ WebSocket → ServerMsg { type:'event', event }
-    ↓ React store.ts → applyEvent() (shared reducer) → UI
+    -> openSpecFor() already resolved in domain.ts (per-session spec)
+    -> runtime.open(OpenOptions) on the 1st message  -> LiveSession
+    -> (if spec.routing) runtime.classify() -> live.setModel()
+    -> live.send(text)
+    -> live.events (AsyncIterable<EventBody>) -> SessionHub.pump() -> emit()
+    -> WebSocket -> ServerMsg { type:'event', event }
+    -> React store.ts -> applyEvent() (shared reducer) -> UI
 ```
 
-`SessionHub.send` (`server/src/hub.ts:86`) marca o estado `running` antes do `await` de abrir o processo, pra nunca abrir dois processos pra mesma sessão em paralelo.
+`SessionHub.send` (`server/src/hub.ts:86`) marks the state `running` before the `await` of opening the process, so it never opens two processes for the same session in parallel.
 
 ## Remote / SSH
 
-Decisões confirmadas em código (`server/src/runtime/ssh-transport.ts`, `server/src/ssh-util.ts`), preservar ao alterar:
+Decisions confirmed in code (`server/src/runtime/ssh-transport.ts`, `server/src/ssh-util.ts`), preserve when changing this area:
 
-- **Sobrevivência da sessão remota**: quando o cliente SSH cai no meio de um turno, o `claude` remoto termina o turno por conta própria; o backend detecta a queda (evento `error/exit`), e `SessionHub.recover()` (`hub.ts:141`) espera via `waitSessionIdle` (polling `pgrep -f`) e reenvia o snapshot completo do jsonl assim que o processo remoto sai.
-- **`claudePath` absoluto**: resolvido via `claudeExpr()`/`DEFAULT_CLAUDE_PATH` (`ssh-util.ts`) porque `~/.local/bin` não está no `PATH` de sessão SSH não-interativa.
-- **`cwd` → nome de diretório**: `encodeCwd(cwd)` substitui tudo que não é `[A-Za-z0-9]` por `-` (`ssh-util.ts:22`), usado em `$HOME/.claude/projects/<encoded>` no host remoto.
-- **Sem repasse de env local**: `spawn()` em `ssh-transport.ts:19-24` não encaminha variáveis de ambiente locais; o remoto usa o próprio ambiente de login.
-- **`pgrep -f` com cuidado**: pattern usado em `waitSessionIdle` (`ssh-transport.ts:86`) é `[${id[0]}]${id.slice(1)}` — o colchete evita que o próprio `pgrep`/shell se autocaseie no grep.
-- **Dois writers no mesmo jsonl**: ao reabrir uma sessão que já existe (`SdkRuntime.open`, `sdk-runtime.ts:224-226`), espera `waitSessionIdle` antes de abrir novo processo, pra não corromper o histórico com dois `claude` escrevendo ao mesmo tempo.
+- **Remote session survival**: when the SSH client drops mid-turn, the remote `claude` finishes the turn on its own; the backend detects the drop (`error/exit` event), and `SessionHub.recover()` (`hub.ts:141`) waits via `waitSessionIdle` (polling `pgrep -f`) and resends the full jsonl snapshot as soon as the remote process exits.
+- **Absolute `claudePath`**: resolved via `claudeExpr()`/`DEFAULT_CLAUDE_PATH` (`ssh-util.ts`) because `~/.local/bin` isn't in the `PATH` of a non-interactive SSH session.
+- **`cwd` -> directory name**: `encodeCwd(cwd)` replaces everything that isn't `[A-Za-z0-9]` with `-` (`ssh-util.ts:22`), used in `$HOME/.claude/projects/<encoded>` on the remote host.
+- **No local env forwarding**: `spawn()` in `ssh-transport.ts:19-24` doesn't forward local environment variables; the remote uses its own login environment.
+- **Careful `pgrep -f`**: the pattern used in `waitSessionIdle` (`ssh-transport.ts:86`) is `[${id[0]}]${id.slice(1)}` — the bracket keeps `pgrep`/the shell itself from matching its own grep.
+- **Two writers on the same jsonl**: when reopening a session that already exists (`SdkRuntime.open`, `sdk-runtime.ts:224-226`), it waits on `waitSessionIdle` before opening a new process, so it doesn't corrupt history with two `claude` processes writing at once.
 
-Isso é diferente do **lock local do backend** (`~/.claude-code-ui/lock`, PID único, um backend por `DATA_DIR`, usado por `restart.sh`) e do **`run.json`** (`server/src/runtime/child.ts`), que só registra PIDs de processos `claude`/`ssh` filhos pra avisar (não matar) órfãos no próximo start — nenhum dos dois usa `pkill -f`.
+This is different from the **local backend lock** (`~/.claude-code-ui/lock`, single PID, one backend per `DATA_DIR`, used by `restart.sh`) and from **`run.json`** (`server/src/runtime/child.ts`), which only tracks PIDs of child `claude`/`ssh` processes to warn about (not kill) orphans on the next start — neither one uses `pkill -f`.
 
 ## WebSocket protocol
 
-Eventos e conceitos arquiteturalmente relevantes (protocolo completo em `shared/src/index.ts`, não listar tudo aqui):
+Architecturally relevant events/concepts (full protocol in `shared/src/index.ts`, not listed exhaustively here):
 
-- `routing.started` / `model.routed { model }` — ciclo do Model Routing por mensagem (ver seção abaixo).
-- `permission.requested { reqId, toolName, input }` / mensagem cliente→servidor `{ type:'permission', sessionId, reqId, allow, updatedInput? }` — mecanismo único usado tanto pra aprovação normal de tool quanto pras respostas do modal `AskUserQuestion` (`updatedInput` carrega as respostas do usuário, resolvido no `canUseTool` do SDK).
-- `turn.completed { totals, modelUsage, ... }` — fecha o turno; `SessionHub` calcula o delta por modelo desta execução (`diffModelUsage`, `hub.ts:26`) porque o jsonl guarda acumulado, não por-turno.
+- `routing.started` / `model.routed { model }` — the per-message Model Routing cycle (see section below).
+- `permission.requested { reqId, toolName, input }` / client-to-server message `{ type:'permission', sessionId, reqId, allow, updatedInput? }` — a single mechanism used both for normal tool approval and for the `AskUserQuestion` modal's answers (`updatedInput` carries the user's answers, resolved inside the SDK's `canUseTool`).
+- `turn.completed { totals, modelUsage, ... }` — closes the turn; `SessionHub` computes the per-model delta for this run (`diffModelUsage`, `hub.ts:26`) because the jsonl stores cumulative totals, not per-turn.
 - `session.state` — `idle | running | awaiting_permission | exited`.
 
 ## Model Routing
 
-- **Objetivo**: por mensagem, decidir Haiku (barato) vs Sonnet (capaz), economizando tokens sem perder qualidade em tarefa complexa.
-- **Quando roda**: só se `project.routing === true` (opt-in, default `false`). Se desligado, `SessionHub.send` pula todo o bloco (`hub.ts:101`) — zero overhead, modelo fixo vem da hierarquia `session.model ?? project.model ?? config.defaults.model` (`domain.ts:13`).
-- **Heurística** (`server/src/runtime/routing.ts`): texto vazio → `haiku`; > 400 chars → `sonnet`; bate `SONNET_HINTS` (implementa/refatora/cria/arquiteta/corrige bug/migra/integra/escreve função...) → `sonnet`; bate `HAIKU_HINTS` (o que/explica/lista/mostra/confirma/qual...) e < 200 chars → `haiku`; nenhuma bate → **zona cinza**, `null`.
-- **Zona cinza**: `SdkRuntime.classifyViaHaiku` (`sdk-runtime.ts:168`) abre sessão Haiku descartável (`persistSession:false, maxTurns:1`, prompt de sistema `CLASSIFY_SYSTEM_PROMPT`), pede 1 palavra (`haiku`/`sonnet`), timeout 15s. Erro/timeout/ambíguo → `sonnet` (nunca cai pro barato em caso de falha).
-- **Escalação**: com routing ligado, o SDK ganha uma MCP tool interna `request_model_upgrade(reason)` (`sdk-runtime.ts:74-84`) — o próprio modelo (rodando em Haiku) pode pedir upgrade pra Sonnet no meio do turno; passa pelo fluxo normal de permissão (`canUseTool`) antes de `q.setModel('sonnet')` rodar.
-- **Estados visuais do turno** (frontend, `reduce.ts`): `routing.started` → fase `routing`; `model.routed` → fase `thinking` (guarda o modelo em `pendingRoutedModel`, exibido na próxima mensagem do usuário); qualquer evento de conteúdo real encerra a fase (`idle`).
-- **Restrição fixa**: roteamento nunca escolhe Opus/Fable — esses ficam bloqueados independente de routing, ver `forbiddenModel` abaixo.
+- **Goal**: per message, decide Haiku (cheap) vs Sonnet (capable), saving tokens without losing quality on complex tasks.
+- **When it runs**: only if `project.routing === true` (opt-in, default `false`). When off, `SessionHub.send` skips the whole block (`hub.ts:101`) — zero overhead, the fixed model comes from the hierarchy `session.model ?? project.model ?? config.defaults.model` (`domain.ts:13`).
+- **Heuristic** (`server/src/runtime/routing.ts`): empty text -> `haiku`; > 400 chars -> `sonnet`; matches `SONNET_HINTS` (implement/refactor/create/architect/fix bug/migrate/integrate/write code...) -> `sonnet`; matches `HAIKU_HINTS` (what is/explain/list/show/confirm/which...) and < 200 chars -> `haiku`; nothing matches -> **gray zone**, `null`.
+- **Gray zone**: `SdkRuntime.classifyViaHaiku` (`sdk-runtime.ts:168`) opens a disposable Haiku session (`persistSession:false, maxTurns:1`, `CLASSIFY_SYSTEM_PROMPT` system prompt), asks for 1 word (`haiku`/`sonnet`), 15s timeout. Error/timeout/ambiguous -> `sonnet` (never falls back to the cheap model on failure).
+- **Escalation**: with routing on, the SDK gets an internal MCP tool `request_model_upgrade(reason)` (`sdk-runtime.ts:74-84`) — the model itself (running on Haiku) can ask for an upgrade to Sonnet mid-turn; it goes through the normal permission flow (`canUseTool`) before `q.setModel('sonnet')` runs.
+- **Visual turn states** (frontend, `reduce.ts`): `routing.started` -> `routing` phase; `model.routed` -> `thinking` phase (stores the model in `pendingRoutedModel`, shown on the user's next message); any real content event ends the phase (`idle`).
+- **Fixed restriction**: routing never picks Opus/Fable — those are blocked regardless of routing, see `forbiddenModel` below.
 
-## Decisões importantes
+## Key decisions
 
-- **Allowlist de modelo**: `forbiddenModel = /opus|fable/i` (`sdk-runtime.ts:43`), checado em `SdkRuntime.open` (allowlist de `MODELS`/`EFFORTS`) e a cada mensagem do SDK (`run()`, defesa em profundidade contra troca de modelo em runtime via comando/config/env). Nunca remover essa checagem redundante.
-- **`bypass` (bypass permissions)**: flag por projeto (`project.bypass`) vira `permissionMode: 'bypassPermissions'` + `allowDangerouslySkipPermissions: true` no SDK (`domain.ts:18`, `sdk-runtime.ts:95`). Feature real, não vulnerabilidade — usuário optou explicitamente por projeto.
-- **Terminal (`!cmd`)**: modo shell é intencionalmente síncrono e sem PTY — roda o comando digitado no `Transport.shell()` (local ou via SSH) e publica `shell.started`/`shell.result` como eventos normais de sessão (replay incluso). Não é um terminal interativo de propósito — SDK's exec de comando bypassaria aprovação de permissão.
+- **Model allowlist**: `forbiddenModel = /opus|fable/i` (`sdk-runtime.ts:43`), checked in `SdkRuntime.open` (`MODELS`/`EFFORTS` allowlist) and on every SDK message (`run()`, defense in depth against a runtime model switch via command/config/env). Never remove this redundant check.
+- **`bypass` (bypass permissions)**: a per-project flag (`project.bypass`) becomes `permissionMode: 'bypassPermissions'` + `allowDangerouslySkipPermissions: true` in the SDK (`domain.ts:18`, `sdk-runtime.ts:95`). A real feature, not a vulnerability — the user explicitly opted in per project.
+- **Terminal (`!cmd`)**: shell mode is deliberately synchronous and PTY-less — it runs the typed command through `Transport.shell()` (local or via SSH) and publishes `shell.started`/`shell.result` as normal session events (included in replay). It's not an interactive terminal on purpose — an SDK exec of a command would bypass permission approval.
