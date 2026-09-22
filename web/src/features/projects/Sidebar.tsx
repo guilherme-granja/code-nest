@@ -100,24 +100,24 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="flex h-screen w-72 shrink-0 flex-col border-r border-zinc-800">
-      <div className="space-y-1 border-b border-zinc-800 p-3">
-        <div className="flex gap-1">
-          <input className="min-w-0 flex-1 rounded bg-zinc-900 px-2 py-1.5 text-sm outline-none" placeholder="Buscar sessões ou #tag…" value={query} onChange={(e) => setQuery(e.target.value)} />
-          <button className="rounded px-2 text-zinc-500 hover:bg-zinc-900 hover:text-zinc-200" title="Ocultar barra lateral (Alt+L)" onClick={toggleSidebar}>«</button>
+    <aside className="flex h-screen w-72 shrink-0 flex-col border-r border-zinc-800/70 bg-zinc-950">
+      <div className="space-y-2.5 border-b border-zinc-800/60 p-3">
+        <div className="flex items-center gap-2 rounded-md border border-zinc-800/80 bg-zinc-900/60 px-2.5 py-1.5 text-zinc-400 transition-colors focus-within:border-zinc-700">
+          <input className="min-w-0 flex-1 bg-transparent text-xs text-zinc-200 outline-none placeholder:text-zinc-500" placeholder="Buscar sessões ou #tag…" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <button className="shrink-0 text-zinc-500 hover:text-zinc-200" title="Ocultar barra lateral (Alt+L)" onClick={toggleSidebar}>«</button>
         </div>
         <div className="flex items-center gap-3 text-xs text-zinc-500">
           <button className="hover:text-zinc-300" onClick={cycleTheme}>{themeLabel[theme]}</button>
           <button className="hover:text-zinc-300" title="Avisa quando uma sessão em segundo plano termina ou pede permissão" onClick={() => void toggleNotify()}>Notificações: {notifyOn ? 'on' : 'off'}</button>
-          <button className="ml-auto hover:text-zinc-300" title="Atalhos (?)" onClick={() => setUi({ help: true })}>?</button>
+          <button className="ml-auto rounded-md px-1.5 py-0.5 text-zinc-500 hover:bg-zinc-900 hover:text-zinc-300" title="Atalhos (?)" onClick={() => setUi({ help: true })}>?</button>
         </div>
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto p-3">
+      <div className="flex-1 space-y-4 overflow-y-auto px-2 py-2">
         {favorites.length > 0 && (
           <section className="space-y-1">
-            <button className="flex w-full items-center gap-1.5 text-left text-xs font-semibold tracking-wide text-zinc-500 hover:text-zinc-300" onClick={() => toggleCollapsed('f')}>
-              <Chevron open={isOpen('f')} /> FAVORITAS <span className="font-normal text-zinc-600">{favorites.length}</span>
+            <button className="flex w-full items-center gap-1.5 px-2 py-1 text-left font-mono text-[10px] font-medium uppercase tracking-wider text-zinc-500 hover:text-zinc-300" onClick={() => toggleCollapsed('f')}>
+              <Chevron open={isOpen('f')} /> Favoritas <span className="font-normal text-zinc-600">{favorites.length}</span>
             </button>
             {isOpen('f') && (
               <ul className="space-y-0.5">
@@ -136,7 +136,7 @@ export function Sidebar() {
           const cp = pulse(cps.map((p) => p.id));
           return (
             <section key={c.id} className="space-y-1.5">
-              <div className="group/c flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+              <div className="group/c flex items-center gap-1 px-2 py-1 font-mono text-[10px] font-medium uppercase tracking-wider text-zinc-500">
                 <button className="flex min-w-0 flex-1 items-center gap-1.5 text-left transition-colors duration-150 hover:text-zinc-300" onClick={() => toggleCollapsed(ck)} title={open ? 'Recolher' : 'Expandir'}>
                   <Chevron open={open} />
                   {c.kind === 'ssh' && <span className={`h-2 w-2 shrink-0 rounded-full ${dot[status[c.id] ?? 'reconnecting']}`} title={status[c.id] ?? 'reconnecting'} />}
@@ -168,20 +168,20 @@ export function Sidebar() {
                             {!pOpen && <Pulse {...pp} />}
                           </button>
                           <button
-                            className={p.lean ? 'rounded bg-zinc-700 px-1.5 text-[10px] text-zinc-200' : 'hidden rounded border border-zinc-700 px-1.5 text-[10px] text-zinc-500 group-hover/p:block'}
+                            className={p.lean ? 'rounded-sm border border-zinc-700 bg-zinc-800/80 px-1.5 py-0.5 font-mono text-[9px] text-zinc-200' : 'hidden rounded-sm border border-zinc-800 px-1.5 py-0.5 font-mono text-[9px] text-zinc-500 group-hover/p:block'}
                             title={`lean ${p.lean ? 'ligado' : 'desligado'}: ignora hooks/plugins/skills/MCP/CLAUDE.md do usuário (~80% mais barato ao iniciar). Clique para alternar.`}
                             onClick={async () => { await api.patchProject(p.id, { lean: !p.lean }); await reloadProjects(); }}
                           >lean</button>
                           <button
-                            className={p.routing ? 'rounded bg-emerald-700 px-1.5 text-[10px] text-zinc-100' : 'hidden rounded border border-zinc-700 px-1.5 text-[10px] text-zinc-500 group-hover/p:block'}
+                            className={p.routing ? 'rounded-sm border border-zinc-700 bg-zinc-800/80 px-1.5 py-0.5 font-mono text-[9px] text-zinc-200' : 'hidden rounded-sm border border-zinc-800 px-1.5 py-0.5 font-mono text-[9px] text-zinc-500 group-hover/p:block'}
                             title={`roteamento de modelo ${p.routing ? 'ligado' : 'desligado'}: escolhe Haiku ou Sonnet por mensagem pra economizar tokens. Clique para alternar.`}
                             onClick={async () => { await api.patchProject(p.id, { routing: !p.routing }); await reloadProjects(); }}
                           >rota</button>
                           <button
-                            className={p.bypass ? 'rounded bg-red-800 px-1.5 text-[10px] text-zinc-100' : 'hidden rounded border border-zinc-700 px-1.5 text-[10px] text-zinc-500 group-hover/p:block'}
+                            className={p.bypass ? 'rounded-sm border border-rose-500/20 bg-rose-500/10 px-1.5 py-0.5 font-mono text-[9px] tracking-wider text-rose-400/80' : 'hidden rounded-sm border border-zinc-800 px-1.5 py-0.5 font-mono text-[9px] text-zinc-500 group-hover/p:block'}
                             title={`bypass de permissões ${p.bypass ? 'ligado' : 'desligado'}: Claude Code roda Bash/edições sem pedir aprovação neste projeto. Use com cuidado. Clique para alternar.`}
                             onClick={async () => { if (p.bypass || confirm(`Ligar bypass de permissões em "${p.name}"? Claude Code vai poder rodar comandos e editar arquivos sem pedir aprovação.`)) { await api.patchProject(p.id, { bypass: !p.bypass }); await reloadProjects(); } }}
-                          >bypass</button>
+                          >BYPASS</button>
                           <button className="hidden rounded px-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-100 group-hover/p:block" title="Nova sessão neste projeto" onClick={() => setUi({ newSession: true, newFor: p.id })}>+</button>
                           <button className="hidden px-1 text-zinc-600 hover:text-red-400 group-hover/p:block" title="Remover projeto (não apaga sessões do Claude)"
                             onClick={async () => { if (confirm(`Remover "${p.name}" da lista?`)) { await api.delProject(p.id); await reloadProjects(); } }}>✕</button>
@@ -202,7 +202,7 @@ export function Sidebar() {
         })}
 
         <label className="flex items-center gap-2 text-xs text-zinc-500">
-          <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> mostrar arquivadas
+          <input type="checkbox" className="h-3.5 w-3.5 rounded-sm border border-zinc-700 bg-zinc-900 accent-zinc-100" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> mostrar arquivadas
         </label>
 
         {adding ? (
@@ -232,7 +232,7 @@ export function Sidebar() {
           <button className="block text-sm text-zinc-400 hover:text-zinc-200" onClick={() => setAddingServer(true)}>+ Servidor remoto</button>
         )}
       </div>
-      <button className="m-3 rounded bg-zinc-100 py-2 text-sm font-medium text-zinc-900 disabled:opacity-40" disabled={!projects.length} onClick={() => setUi({ newSession: true, newFor: null })}>+ Nova sessão</button>
+      <button className="m-3 flex items-center justify-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 py-1.5 text-xs font-medium text-zinc-200 transition-colors hover:bg-zinc-900 disabled:opacity-40" disabled={!projects.length} onClick={() => setUi({ newSession: true, newFor: null })}>+ Nova sessão</button>
     </aside>
   );
 }
