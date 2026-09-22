@@ -12,10 +12,11 @@ export function GitBar({ projectId, refreshKey }: { projectId: string; refreshKe
   }, [projectId, refreshKey]);
   if (!g) return null;
   return (
-    <div className="flex items-center gap-3 border-b border-zinc-800 px-4 py-1 text-xs text-zinc-400">
-      <span className="font-mono text-zinc-300">⎇ {g.branch ?? '(detached)'}</span>
-      {g.ahead > 0 && <span title="commits à frente do upstream">↑{g.ahead}</span>}
-      {g.behind > 0 && <span title="commits atrás do upstream">↓{g.behind}</span>}
+    <div className="flex items-center gap-2.5 border-b border-zinc-800/60 bg-zinc-950/80 px-4 py-1.5 font-mono text-[11px] text-zinc-400">
+      <span className="text-zinc-300">⎇ {g.branch ?? '(detached)'}</span>
+      {g.ahead > 0 && <span className="text-emerald-400" title="commits à frente do upstream">+{g.ahead}</span>}
+      {g.behind > 0 && <span className="text-rose-400" title="commits atrás do upstream">-{g.behind}</span>}
+      <span className="text-zinc-600">·</span>
       <span>{g.changed} alterados</span>
       <span>{g.untracked} novos</span>
     </div>

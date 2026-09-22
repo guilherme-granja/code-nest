@@ -121,22 +121,22 @@ export function Chat() {
 
   return (
     <main className="flex min-h-0 flex-1 flex-col">
-      <header className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-zinc-800 px-4 py-2.5">
-        <h1 className="truncate text-[15px] font-semibold text-zinc-100">{name}</h1>
-        <div className="flex items-center gap-2 text-xs text-zinc-500" title={usageTitle}>
-          <span className="font-mono">${chat.totals.costUsd.toFixed(4)}</span>
-          <span className="text-zinc-700">·</span>
-          <span>{fmtTokens(chat.totals.input + chat.totals.output)} tokens</span>
-        </div>
-        <div className="flex items-center justify-end gap-3">
-          {!up && <span className="text-xs text-red-400">desconectado…</span>}
-          {busy && <button className="rounded border border-zinc-600 px-2 py-0.5 text-xs text-zinc-300 transition-colors hover:bg-zinc-800" onClick={interrupt}>Pausar</button>}
-          <button className={`rounded border px-2 py-0.5 text-xs transition-colors hover:bg-zinc-800 ${ui.term ? 'border-zinc-500 text-zinc-200' : 'border-zinc-700 text-zinc-400'}`} title="Subagentes e comandos ! (Ctrl+J)" onClick={() => setUi({ term: !ui.term })}>Terminal</button>
+      <header className="flex items-center justify-between gap-3 border-b border-zinc-800/60 bg-zinc-950/90 px-4 py-2.5 backdrop-blur-md">
+        <h1 className="truncate text-sm font-medium tracking-tight text-zinc-100">{name}</h1>
+        <div className="flex items-center gap-3">
+          <div className="hidden items-center gap-2 rounded-md border border-zinc-800/60 bg-zinc-900/50 px-2.5 py-1 font-mono text-xs text-zinc-400 sm:flex" title={usageTitle}>
+            <span className="text-zinc-300">${chat.totals.costUsd.toFixed(4)}</span>
+            <span className="text-zinc-600">·</span>
+            <span>{fmtTokens(chat.totals.input + chat.totals.output)} tokens</span>
+          </div>
+          {!up && <span className="text-xs text-rose-400">desconectado…</span>}
+          {busy && <button className="rounded-md border border-zinc-800 px-2.5 py-1 text-xs text-zinc-300 transition-colors hover:border-zinc-700 hover:bg-zinc-900" onClick={interrupt}>Pausar</button>}
+          <button className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors ${ui.term ? 'border-zinc-700 bg-zinc-900 text-zinc-100' : 'border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-900'}`} title="Subagentes e comandos ! (Ctrl+J)" onClick={() => setUi({ term: !ui.term })}>Terminal</button>
         </div>
       </header>
       <GitBar projectId={active.projectId} refreshKey={`${active.sessionId}:${busy ? 'busy' : 'rest'}`} />
       {connState !== 'up' && (
-        <div className="border-b border-amber-900 bg-amber-950/40 px-4 py-1 text-xs text-amber-300">
+        <div className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-1 text-xs text-amber-400">
           Servidor {connLabel}: {connState === 'down' ? 'sem conexão. O turno em andamento termina no servidor e o histórico completo aparece ao reconectar.' : 'reconectando…'}
         </div>
       )}

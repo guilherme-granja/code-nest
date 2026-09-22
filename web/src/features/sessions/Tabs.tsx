@@ -7,7 +7,7 @@ export function Tabs() {
   const attention = useApp((s) => s.attention);
   if (tabs.length === 0) return null;
   return (
-    <div className="flex shrink-0 overflow-x-auto border-b border-zinc-800 text-sm">
+    <div className="flex shrink-0 overflow-x-auto border-b border-zinc-800/70 bg-zinc-950 text-sm">
       {tabs.map((t) => {
         const name = rows[t.projectId]?.find((r) => r.sessionId === t.sessionId)?.name ?? 'Sessão';
         const state = chats[t.sessionId]?.state;
@@ -18,8 +18,8 @@ export function Tabs() {
             role="tab"
             onClick={() => open(t.projectId, t.sessionId)}
             onAuxClick={(e) => { if (e.button === 1) closeTab(t.sessionId); }}
-            className={`group flex max-w-56 shrink-0 cursor-pointer items-center gap-2 border-r border-zinc-800 px-3 py-1.5 transition-colors duration-150 ${
-              active?.sessionId === t.sessionId ? 'border-b-2 border-b-zinc-100 bg-zinc-900 text-zinc-100' : 'border-b-2 border-b-transparent text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200'
+            className={`group flex max-w-56 shrink-0 cursor-pointer items-center gap-2 border-r border-zinc-800/70 px-3 py-1.5 text-xs transition-colors duration-150 ${
+              active?.sessionId === t.sessionId ? 'border-b-2 border-b-zinc-100 bg-zinc-900/70 text-zinc-100' : 'border-b-2 border-b-transparent text-zinc-400 hover:bg-zinc-900/50 hover:text-zinc-200'
             }`}
           >
             <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${color}`} />
