@@ -41,8 +41,8 @@ export function AskUserQuestionModal({ p, onAnswer }: { p: PendingPermission; on
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-900 p-4 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]">
         <div className="mb-3 text-sm text-zinc-400">Claude tem uma pergunta antes de continuar</div>
         <div className="space-y-5">
           {input.questions.map((q, qi) => (
@@ -56,7 +56,7 @@ export function AskUserQuestionModal({ p, onAnswer }: { p: PendingPermission; on
                     <button
                       key={o.label}
                       onClick={() => toggle(qi, o.label, q.multiSelect)}
-                      className={`block w-full rounded border px-3 py-2 text-left text-sm transition-colors duration-150 ${on ? 'border-zinc-400 bg-zinc-800' : 'border-zinc-800 hover:border-zinc-600 hover:bg-zinc-800/50'}`}
+                      className={`block w-full rounded-md border px-3 py-2 text-left text-sm transition-colors duration-150 ${on ? 'border-zinc-100 bg-zinc-800' : 'border-zinc-800 hover:border-zinc-600 hover:bg-zinc-800/50'}`}
                     >
                       <div className="font-medium text-zinc-100">{o.label}</div>
                       <div className="text-xs text-zinc-500">{o.description}</div>
@@ -76,7 +76,7 @@ export function AskUserQuestionModal({ p, onAnswer }: { p: PendingPermission; on
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <button className="rounded px-3 py-1.5 text-sm text-zinc-400 hover:text-zinc-200" onClick={() => onAnswer(false)}>Cancelar</button>
-          <button className="rounded bg-zinc-100 px-3 py-1.5 text-sm font-medium text-zinc-900 disabled:opacity-40" disabled={!canSubmit} onClick={submit}>Responder</button>
+          <button className="rounded-md bg-zinc-100 px-3 py-1.5 text-sm font-medium text-zinc-950 transition-colors hover:bg-zinc-200 disabled:opacity-40" disabled={!canSubmit} onClick={submit}>Responder</button>
         </div>
       </div>
     </div>

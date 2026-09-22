@@ -147,16 +147,20 @@ export function Chat() {
         {chat.items.map((it, i) => <ItemView key={i} it={it} busy={busy} bypass={!!project?.bypass} />)}
         {chat.turnPhase !== 'idle' && <TurnLoading phase={chat.turnPhase} startedAt={chat.turnPhaseAt} now={now} />}
         {chat.pending.filter((p) => !isAskUserQuestion(p)).map((p) => (
-          <div key={p.reqId} className="rounded border border-amber-700 bg-amber-950/30 p-3 text-sm">
-            <div className="font-medium">
-              {p.toolName === 'request_model_upgrade'
-                ? <>Claude quer trocar pra <span className="text-zinc-100">Sonnet 5</span> — {String((p.input as { reason?: unknown } | null)?.reason ?? '')}</>
-                : <>Permitir <code>{p.toolName}</code>?</>}
+          <div key={p.reqId} className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/50 shadow-md">
+            <div className="flex items-center gap-2.5 border-b border-zinc-800/80 bg-zinc-900/60 px-4 py-3">
+              <div className="text-xs font-semibold text-zinc-100">
+                {p.toolName === 'request_model_upgrade'
+                  ? <>Claude quer trocar pra <span className="text-zinc-100">Sonnet 5</span> — {String((p.input as { reason?: unknown } | null)?.reason ?? '')}</>
+                  : <>Permitir <code className="rounded bg-zinc-800/80 px-1 py-0.5 font-mono text-[11px]">{p.toolName}</code>?</>}
+              </div>
             </div>
-            {p.toolName !== 'request_model_upgrade' && <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap text-xs text-zinc-300">{json(p.input)}</pre>}
-            <div className="mt-2 flex gap-2">
-              <button className="rounded bg-green-700 px-3 py-1 text-white" onClick={() => answer(p.reqId, true)}>Permitir</button>
-              <button className="rounded bg-zinc-700 px-3 py-1" onClick={() => answer(p.reqId, false)}>Negar</button>
+            <div className="flex flex-col gap-3 p-4">
+              {p.toolName !== 'request_model_upgrade' && <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md border border-zinc-800/90 bg-zinc-950 p-3 font-mono text-xs text-zinc-300">{json(p.input)}</pre>}
+              <div className="flex items-center gap-1.5">
+                <button className="inline-flex items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-950 transition-all hover:bg-zinc-200 active:scale-[0.98]" onClick={() => answer(p.reqId, true)}>Permitir</button>
+                <button className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-zinc-400 transition-colors hover:bg-rose-500/10 hover:text-rose-400" onClick={() => answer(p.reqId, false)}>Negar</button>
+              </div>
             </div>
           </div>
         ))}
