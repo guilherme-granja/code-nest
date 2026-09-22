@@ -1,10 +1,11 @@
-import { useState, useSyncExternalStore } from 'react';
-import type { SessionRow } from '@ccui/shared';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import type { Project, SessionRow } from '@ccui/shared';
 import { api } from '../../api';
 import { matchRow } from '../../lib/search';
-import { useApp } from '../../store';
+import { SIDEBAR_W_MAX, SIDEBAR_W_MIN, useApp } from '../../store';
 import { cycleTheme, getTheme, subscribeTheme, themeLabel } from '../../theme';
 import { ServerForm } from '../connect/ServerForm';
+import { ProjectSettingsModal } from './ProjectSettingsModal';
 
 const ago = (t: number) => {
   const s = (t - Date.now()) / 1000, a = Math.abs(s);
@@ -22,7 +23,19 @@ function Pulse({ busy, attn }: { busy: boolean; attn: boolean }) {
   return null;
 }
 
-function SessionItem({ r, projectId, projectName, onTag }: { r: SessionRow; projectId: string; projectName?: string; onTag: (t: string) => void }) {
+// pontinhos discretos mostrando quais flags do projeto-pai estão ativas nesta sessão (não competem com o nome)
+function ProjectFlags({ p }: { p: Project }) {
+  const flags: Array<[boolean | undefined, string, string]> = [[p.lean, 'bg-zinc-500', 'lean'], [p.routing, 'bg-zinc-400', 'model routing'], [p.bypass, 'bg-rose-400/80', 'bypass de permissões']];
+  const on = flags.filter(([v]) => v);
+  if (on.length === 0) return null;
+  return (
+    <span className="flex shrink-0 items-center gap-0.5" title={`Projeto: ${on.map(([, , l]) => l).join(', ')} ativo(s)`}>
+      {on.map(([, cls, l]) => <span key={l} className={`h-1 w-1 rounded-full ${cls}`} />)}
+    </span>
+  );
+}
+
+function SessionItem({ r, projectId, project, projectName, onTag }: { r: SessionRow; projectId: string; project: Project; projectName?: string; onTag: (t: string) => void }) {
   const { active, open, patchSession } = useApp();
   const state = useApp((s) => s.chats[r.sessionId]?.state);
   const attention = useApp((s) => !!s.attention[r.sessionId]);
@@ -42,6 +55,7 @@ function SessionItem({ r, projectId, projectName, onTag }: { r: SessionRow; proj
       >
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${color}`} />
         <span className={`flex-1 truncate ${attention ? 'font-semibold' : ''} ${r.archived ? 'text-zinc-500' : ''}`}>{r.name}</span>
+        <ProjectFlags p={project} />
         {projectName && <span className="shrink-0 text-[10px] text-zinc-600">{projectName}</span>}
         <span className="shrink-0 text-[11px] text-zinc-600 group-hover:invisible">{ago(r.lastModified)}</span>
       </button>
@@ -64,10 +78,19 @@ function SessionItem({ r, projectId, projectName, onTag }: { r: SessionRow; proj
 }
 
 export function Sidebar() {
-  const { config, projects, rows, status, notifyOn, layout, reloadProjects, setUi, toggleNotify, toggleSidebar, toggleCollapsed } = useApp();
+  const { config, projects, rows, status, notifyOn, layout, reloadProjects, setUi, toggleNotify, toggleSidebar, toggleCollapsed, setSidebarW, ui } = useApp();
   const chats = useApp((s) => s.chats);
   const attention = useApp((s) => s.attention);
   const theme = useSyncExternalStore(subscribeTheme, getTheme);
+  const dragging = useRef(false);
+  // arrasto na borda direita: mousemove/mouseup globais só enquanto dragging.current, sem re-render por movimento (setSidebarW já persiste)
+  useEffect(() => {
+    const move = (e: MouseEvent) => { if (dragging.current) setSidebarW(e.clientX); };
+    const up = () => { dragging.current = false; document.body.style.cursor = ''; };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    return () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+  }, [setSidebarW]);
   const [query, setQuery] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -100,7 +123,13 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="flex h-screen w-72 shrink-0 flex-col border-r border-zinc-800/70 bg-zinc-950">
+    <aside className="relative flex h-screen shrink-0 flex-col border-r border-zinc-800/70 bg-zinc-950" style={{ width: layout.sidebarW }}>
+      {/* alça de redimensionar: arrasta pra qualquer largura entre SIDEBAR_W_MIN e SIDEBAR_W_MAX (persistido em ccui-layout) */}
+      <div
+        className="absolute right-0 top-0 z-10 h-full w-1 cursor-col-resize hover:bg-zinc-700/60"
+        onMouseDown={(e) => { e.preventDefault(); dragging.current = true; document.body.style.cursor = 'col-resize'; }}
+        title={`Arraste para redimensionar (${SIDEBAR_W_MIN}–${SIDEBAR_W_MAX}px)`}
+      />
       <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-zinc-800/60 px-3">
         <img src="/logo.png" alt="" className="h-5 w-5 shrink-0 rounded-[5px]" />
         <span className="text-sm font-medium tracking-tight text-zinc-100">Code Nest</span>
@@ -125,7 +154,7 @@ export function Sidebar() {
             </button>
             {isOpen('f') && (
               <ul className="space-y-0.5">
-                {favorites.map(({ r, p }) => <SessionItem key={r.sessionId} r={r} projectId={p.id} projectName={p.name} onTag={(t) => setQuery(`#${t}`)} />)}
+                {favorites.map(({ r, p }) => <SessionItem key={r.sessionId} r={r} projectId={p.id} project={p} projectName={p.name} onTag={(t) => setQuery(`#${t}`)} />)}
               </ul>
             )}
           </section>
@@ -171,29 +200,14 @@ export function Sidebar() {
                             <span className="ml-auto text-xs font-normal text-zinc-600">{list.length}</span>
                             {!pOpen && <Pulse {...pp} />}
                           </button>
-                          <button
-                            className={p.lean ? 'rounded-sm border border-zinc-700 bg-zinc-800/80 px-1.5 py-0.5 font-mono text-[9px] text-zinc-200' : 'hidden rounded-sm border border-zinc-800 px-1.5 py-0.5 font-mono text-[9px] text-zinc-500 group-hover/p:block'}
-                            title={`lean ${p.lean ? 'ligado' : 'desligado'}: ignora hooks/plugins/skills/MCP/CLAUDE.md do usuário (~80% mais barato ao iniciar). Clique para alternar.`}
-                            onClick={async () => { await api.patchProject(p.id, { lean: !p.lean }); await reloadProjects(); }}
-                          >lean</button>
-                          <button
-                            className={p.routing ? 'rounded-sm border border-zinc-700 bg-zinc-800/80 px-1.5 py-0.5 font-mono text-[9px] text-zinc-200' : 'hidden rounded-sm border border-zinc-800 px-1.5 py-0.5 font-mono text-[9px] text-zinc-500 group-hover/p:block'}
-                            title={`roteamento de modelo ${p.routing ? 'ligado' : 'desligado'}: escolhe Haiku ou Sonnet por mensagem pra economizar tokens. Clique para alternar.`}
-                            onClick={async () => { await api.patchProject(p.id, { routing: !p.routing }); await reloadProjects(); }}
-                          >rota</button>
-                          <button
-                            className={p.bypass ? 'rounded-sm border border-rose-500/20 bg-rose-500/10 px-1.5 py-0.5 font-mono text-[9px] tracking-wider text-rose-400/80' : 'hidden rounded-sm border border-zinc-800 px-1.5 py-0.5 font-mono text-[9px] text-zinc-500 group-hover/p:block'}
-                            title={`bypass de permissões ${p.bypass ? 'ligado' : 'desligado'}: Claude Code roda Bash/edições sem pedir aprovação neste projeto. Use com cuidado. Clique para alternar.`}
-                            onClick={async () => { if (p.bypass || confirm(`Ligar bypass de permissões em "${p.name}"? Claude Code vai poder rodar comandos e editar arquivos sem pedir aprovação.`)) { await api.patchProject(p.id, { bypass: !p.bypass }); await reloadProjects(); } }}
-                          >BYPASS</button>
+                          <ProjectFlags p={p} />
+                          <button className="hidden rounded px-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-100 group-hover/p:block" title="Configurações do projeto" onClick={() => setUi({ settingsFor: p.id })}>⚙</button>
                           <button className="hidden rounded px-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-100 group-hover/p:block" title="Nova sessão neste projeto" onClick={() => setUi({ newSession: true, newFor: p.id })}>+</button>
-                          <button className="hidden px-1 text-zinc-600 hover:text-red-400 group-hover/p:block" title="Remover projeto (não apaga sessões do Claude)"
-                            onClick={async () => { if (confirm(`Remover "${p.name}" da lista?`)) { await api.delProject(p.id); await reloadProjects(); } }}>✕</button>
                         </div>
                         {pOpen && (
                           <ul className="mt-1 space-y-0.5 border-l border-zinc-800/50 pl-1">
                             {list.length === 0 && <li className="px-2 py-1 text-xs text-zinc-600">Nenhuma sessão</li>}
-                            {list.map((r) => <SessionItem key={r.sessionId} r={r} projectId={p.id} onTag={(t) => setQuery(`#${t}`)} />)}
+                            {list.map((r) => <SessionItem key={r.sessionId} r={r} projectId={p.id} project={p} onTag={(t) => setQuery(`#${t}`)} />)}
                           </ul>
                         )}
                       </div>
@@ -237,6 +251,7 @@ export function Sidebar() {
         )}
       </div>
       <button className="m-3 flex items-center justify-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 py-1.5 text-xs font-medium text-zinc-200 transition-colors hover:bg-zinc-900 disabled:opacity-40" disabled={!projects.length} onClick={() => setUi({ newSession: true, newFor: null })}>+ Nova sessão</button>
+      {ui.settingsFor && <ProjectSettingsModal projectId={ui.settingsFor} onClose={() => setUi({ settingsFor: null })} />}
     </aside>
   );
 }

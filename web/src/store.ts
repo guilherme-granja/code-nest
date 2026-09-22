@@ -6,15 +6,23 @@ import { disableNotify, enableNotify, notify, notifyEnabled } from './notify';
 import { createSocket } from './ws';
 
 export interface Tab { projectId: string; sessionId: string }
-export interface Ui { palette: boolean; help: boolean; newSession: boolean; newFor: string | null; term: boolean }
-// preferências de layout lembradas entre execuções: barra lateral visível e grupos/projetos recolhidos (chaves "c:<conexão>", "p:<projeto>", "f")
-export interface Layout { sidebar: boolean; collapsed: Record<string, boolean> }
+export interface Ui { palette: boolean; help: boolean; newSession: boolean; newFor: string | null; term: boolean; settingsFor: string | null }
+export const SIDEBAR_W_MIN = 224;
+export const SIDEBAR_W_MAX = 420;
+export const SIDEBAR_W_DEFAULT = 288;
+// preferências de layout lembradas entre execuções: barra lateral visível/largura e grupos/projetos recolhidos (chaves "c:<conexão>", "p:<projeto>", "f")
+export interface Layout { sidebar: boolean; sidebarW: number; collapsed: Record<string, boolean> }
 const LAYOUT_KEY = 'ccui-layout';
+const clampW = (w: number) => Math.min(SIDEBAR_W_MAX, Math.max(SIDEBAR_W_MIN, w));
 const loadLayout = (): Layout => {
   try {
     const v = JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? '{}');
-    return { sidebar: v.sidebar !== false, collapsed: v.collapsed && typeof v.collapsed === 'object' ? v.collapsed : {} };
-  } catch { return { sidebar: true, collapsed: {} }; }
+    return {
+      sidebar: v.sidebar !== false,
+      sidebarW: typeof v.sidebarW === 'number' ? clampW(v.sidebarW) : SIDEBAR_W_DEFAULT,
+      collapsed: v.collapsed && typeof v.collapsed === 'object' ? v.collapsed : {},
+    };
+  } catch { return { sidebar: true, sidebarW: SIDEBAR_W_DEFAULT, collapsed: {} }; }
 };
 const saveLayout = (l: Layout) => { try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(l)); } catch { /* ignora */ } };
 type SessionPatch = { name?: string; favorite?: boolean; archived?: boolean; tags?: string[] };
@@ -43,6 +51,7 @@ interface App {
   patchSession(sessionId: string, projectId: string, patch: SessionPatch): Promise<void>;
   setUi(p: Partial<Ui>): void;
   toggleSidebar(): void;
+  setSidebarW(w: number): void;
   toggleCollapsed(key: string): void;
   ensureCommands(projectId: string): Promise<void>;
   toggleNotify(): Promise<void>;
@@ -87,7 +96,7 @@ export const useApp = create<App>((set, get) => {
 
   return {
     tokenMissing: false, up: false, config: null, projects: [], rows: {}, active: null, tabs: [], chats: {}, status: {},
-    attention: {}, notifyOn: notifyEnabled(), ui: { palette: false, help: false, newSession: false, newFor: null, term: false },
+    attention: {}, notifyOn: notifyEnabled(), ui: { palette: false, help: false, newSession: false, newFor: null, term: false, settingsFor: null },
     layout: loadLayout(), commands: {},
 
     async start() {
@@ -167,6 +176,11 @@ export const useApp = create<App>((set, get) => {
 
     toggleSidebar() {
       const layout = { ...get().layout, sidebar: !get().layout.sidebar };
+      saveLayout(layout);
+      set({ layout });
+    },
+    setSidebarW(w) {
+      const layout = { ...get().layout, sidebarW: clampW(w) };
       saveLayout(layout);
       set({ layout });
     },
