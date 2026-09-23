@@ -40,13 +40,13 @@ function ItemView({ it, busy, bypass }: { it: Item; busy: boolean; bypass: boole
   return <ToolCard it={it} />;
 }
 
-function TurnLoading({ phase, startedAt, now }: { phase: 'routing' | 'thinking'; startedAt: number; now: number }) {
+function TurnLoading({ phase, tool, startedAt, now }: { phase: 'routing' | 'thinking'; tool?: string; startedAt: number; now: number }) {
   const secs = Math.max(0, Math.round((now - startedAt) / 1000));
-  const dot = phase === 'routing' ? 'routing-dot' : 'thinking-dot';
+  const label = phase === 'routing' ? 'Model Routing is helping you' : tool ? `Claude Code is running ${tool}` : 'Claude Code is thinking';
   return (
     <div className="flex items-center gap-2 rounded-md border border-zinc-800/70 bg-zinc-900/40 px-2.5 py-1 font-mono text-[11px] text-zinc-400">
-      <span className="flex items-center gap-0.5"><span className={dot} /><span className={dot} /><span className={dot} /></span>
-      {phase === 'routing' ? 'Model Routing is helping you' : 'Claude Code is thinking'} … ({secs}s)
+      <span className="flex items-center gap-0.5"><span className="routing-dot" /><span className="routing-dot" /><span className="routing-dot" /></span>
+      {label} … ({secs}s)
     </div>
   );
 }
@@ -120,11 +120,15 @@ export function Chat() {
   // leading "/name" once picked/finished (followed by whitespace, or menu closed): blue if it exists, red if not (visual only)
   const slash = /^\/(\S+)(\s|$)/.exec(text);
   const slashKnown = slash && commands && (slash[2] || !menuOpen) ? commands.some((c) => c.name === slash[1]) : undefined;
+  const bang = text.startsWith('!');
+  const mirrored = bang || (!!slash && slashKnown !== undefined);
 
   if (!active || !chat) return <div className="flex flex-1 items-center justify-center text-zinc-500">Selecione ou crie uma sessão (Ctrl+K)</div>;
 
   const name = rows[active.projectId]?.find((r) => r.sessionId === active.sessionId)?.name ?? 'Sessão';
   const busy = chat.state === 'running' || chat.state === 'awaiting_permission';
+  const lastItem = chat.items.at(-1);
+  const runningTool = lastItem?.kind === 'tool' && lastItem.output === undefined ? lastItem.name : undefined;
   const stuck = chat.state === 'running' && now - chat.lastEventAt > STUCK_MS;
   const connId = project?.connectionId ?? 'local';
   const connState = status[connId] ?? 'up';
@@ -183,7 +187,7 @@ export function Chat() {
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
         {chat.items.map((it, i) => <ItemView key={i} it={it} busy={busy} bypass={!!project?.bypass} />)}
-        {chat.turnPhase !== 'idle' && <TurnLoading phase={chat.turnPhase} startedAt={chat.turnPhaseAt} now={now} />}
+        {chat.turnPhase !== 'idle' && chat.state !== 'awaiting_permission' && <TurnLoading phase={chat.turnPhase} tool={runningTool} startedAt={chat.turnPhaseAt} now={now} />}
         {chat.pending.filter((p) => !isAskUserQuestion(p)).map((p) => (
           <div key={p.reqId} className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/50 shadow-md">
             <div className="flex items-center gap-2.5 border-b border-zinc-800/80 bg-zinc-900/60 px-4 py-3">
@@ -219,16 +223,17 @@ export function Chat() {
         <div className="flex flex-col rounded-xl border border-zinc-800 bg-zinc-900/90 transition-colors focus-within:border-zinc-700">
           <AttachedFilesPill sessionId={active.sessionId} connectionId={connId} />
           <div className="relative">
-            {slash && slashKnown !== undefined && (
-              // mirror behind a transparent-text textarea, so only the command token gets colored
+            {mirrored && (
+              // mirror behind a transparent-text textarea, so only the command token (or "!" shell prefix) gets colored
               <div ref={mirror} aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words p-3 text-sm text-zinc-100 [scrollbar-gutter:stable]">
-                <span className={`underline underline-offset-2 ${slashKnown ? 'text-sky-400' : 'text-red-400'}`}>/{slash[1]}</span>
-                {text.slice(slash[1].length + 1)}{' '}
+                {bang
+                  ? <><span className="text-red-500">!</span><span className="rounded-sm bg-zinc-300 text-zinc-900 [box-decoration-break:clone]">{text.slice(1)}</span>{' '}</>
+                  : slash && <><span className={`underline underline-offset-2 ${slashKnown ? 'text-sky-400' : 'text-red-400'}`}>/{slash[1]}</span>{text.slice(slash[1].length + 1)}{' '}</>}
               </div>
             )}
             <textarea
               ref={input}
-              className={`block min-h-20 max-h-[50vh] w-full resize-y rounded-t-xl bg-transparent p-3 text-sm outline-none [scrollbar-gutter:stable] placeholder:text-zinc-500 disabled:opacity-50 ${slash && slashKnown !== undefined ? 'relative text-transparent caret-zinc-100' : 'text-zinc-100'}`}
+              className={`block min-h-20 max-h-[50vh] w-full resize-y rounded-t-xl bg-transparent p-3 text-sm outline-none [scrollbar-gutter:stable] placeholder:text-zinc-500 disabled:opacity-50 ${mirrored ? `relative text-transparent ${bang ? 'caret-zinc-900' : 'caret-zinc-100'}` : 'text-zinc-100'}`}
               placeholder={busy ? 'Aguarde a resposta…' : 'Mensagem… ("/" comandos · "!" shell · Enter envia · Shift+Enter quebra linha)'}
               value={text}
               disabled={busy || !up}

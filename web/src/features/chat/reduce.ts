@@ -61,8 +61,8 @@ export function applyEvent(c: Chat, ev: ClaudeEvent): Chat {
   const items = c.items.slice();
   const last = items[items.length - 1];
   const next: Chat = { ...c, items, lastSeq: ev.seq, lastEventAt: ev.ts };
-  // qualquer evento que não seja parte da "espera" (roteamento/pensando) encerra o indicador — conteúdo real chegou
-  if (ev.type !== 'routing.started' && ev.type !== 'model.routed' && ev.type !== 'user.message') next.turnPhase = 'idle';
+  // the progress indicator stays up for the whole turn (thinking, tools, streaming) and only ends with it
+  if (ev.type === 'turn.completed' || ev.type === 'error' || (ev.type === 'session.state' && (ev.state === 'idle' || ev.state === 'exited'))) next.turnPhase = 'idle';
   switch (ev.type) {
     case 'user.message':
       items.push({ kind: 'user', text: ev.text, routedModel: c.pendingRoutedModel });
