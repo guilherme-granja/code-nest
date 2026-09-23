@@ -4,6 +4,7 @@ import { fmtTokens } from '../../lib/format';
 import { useApp } from '../../store';
 import { IconLock, IconShuffle } from '../../lib/icons';
 import { AskUserQuestionModal, isAskUserQuestion } from './AskUserQuestionModal';
+import { AttachMenu } from './AttachMenu';
 import { CommandsPanel } from './CommandsPanel';
 import { GitBar } from './GitBar';
 import { Markdown } from './Markdown';
@@ -58,6 +59,33 @@ function TurnSummary({ modelUsage, bypass }: { modelUsage: Record<string, ModelU
     <div className="flex items-center justify-center gap-2 text-center font-mono text-[11px] text-zinc-600">
       turno concluído — ${cost.toFixed(4)} · {fmtTokens(tok)} tokens · {models}
       {bypass && <span className="rounded-sm border border-rose-500/20 bg-rose-500/10 px-1.5 py-0.5 text-[10px] tracking-wider text-rose-400/80">bypass</span>}
+    </div>
+  );
+}
+
+function AttachedFilesPill({ sessionId, connectionId }: { sessionId: string; connectionId: string }) {
+  const files = useApp((s) => s.attachments[sessionId] ?? []);
+  const removeAttachment = useApp((s) => s.removeAttachment);
+  const [open, setOpen] = useState(false);
+  if (files.length === 0) return null;
+  return (
+    <div className="relative">
+      <button className="rounded-md border border-zinc-800/60 bg-zinc-900/50 px-2.5 py-1 font-mono text-xs text-zinc-400 hover:border-zinc-700" onClick={() => setOpen((o) => !o)}>
+        {files.length} {files.length === 1 ? 'arquivo' : 'arquivos'}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-72 rounded-md border border-zinc-800 bg-zinc-900 p-2 shadow-xl" onMouseLeave={() => setOpen(false)}>
+          <ul className="mb-2 space-y-1">
+            {files.map((f) => (
+              <li key={f} className="flex items-center justify-between gap-2 rounded-sm bg-zinc-950/40 px-2 py-1 text-[11px] text-zinc-300">
+                <span className="min-w-0 flex-1 truncate font-mono">{f}</span>
+                <button className="shrink-0 text-zinc-500 hover:text-rose-400" onClick={() => removeAttachment(sessionId, f)}>✕</button>
+              </li>
+            ))}
+          </ul>
+          <AttachMenu sessionId={sessionId} connectionId={connectionId} />
+        </div>
+      )}
     </div>
   );
 }
@@ -133,6 +161,7 @@ export function Chat() {
             <span className="text-zinc-600">·</span>
             <span>{fmtTokens(chat.totals.input + chat.totals.output)} tokens</span>
           </div>
+          <AttachedFilesPill sessionId={active.sessionId} connectionId={connId} />
           {!up && <span className="text-xs text-rose-400">desconectado…</span>}
           {busy && <button className="rounded-md border border-zinc-800 px-2.5 py-1 text-xs text-zinc-300 transition-colors hover:border-zinc-700 hover:bg-zinc-900" onClick={interrupt}>Pausar</button>}
           <button className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors ${ui.term ? 'border-zinc-700 bg-zinc-900 text-zinc-100' : 'border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-900'}`} title="Subagentes e comandos ! (Ctrl+J)" onClick={() => setUi({ term: !ui.term })}>Terminal</button>
@@ -180,15 +209,18 @@ export function Chat() {
 
       <div className="relative border-t border-zinc-800/70 bg-zinc-950 p-3">
         {menuOpen && <SlashMenu items={matches} sel={Math.min(sel, matches.length - 1)} lean={!!project?.lean} onPick={pick} onHover={setSel} />}
-        <textarea
-          ref={input}
-          className="h-20 w-full resize-none rounded-xl border border-zinc-800 bg-zinc-900/90 p-3 text-sm text-zinc-100 outline-none transition-colors duration-150 placeholder:text-zinc-500 focus:border-zinc-700 disabled:opacity-50"
-          placeholder={busy ? 'Aguarde a resposta…' : 'Mensagem… ("/" comandos · "!" shell · Enter envia · Shift+Enter quebra linha)'}
-          value={text}
-          disabled={busy || !up}
-          onChange={(e) => { setText(e.target.value); setSel(0); setDismissed(false); }}
-          onKeyDown={onKeyDown}
-        />
+        <div className="flex items-end gap-2">
+          <AttachMenu sessionId={active.sessionId} connectionId={connId} />
+          <textarea
+            ref={input}
+            className="h-20 min-w-0 flex-1 resize-none rounded-xl border border-zinc-800 bg-zinc-900/90 p-3 text-sm text-zinc-100 outline-none transition-colors duration-150 placeholder:text-zinc-500 focus:border-zinc-700 disabled:opacity-50"
+            placeholder={busy ? 'Aguarde a resposta…' : 'Mensagem… ("/" comandos · "!" shell · Enter envia · Shift+Enter quebra linha)'}
+            value={text}
+            disabled={busy || !up}
+            onChange={(e) => { setText(e.target.value); setSel(0); setDismissed(false); }}
+            onKeyDown={onKeyDown}
+          />
+        </div>
       </div>
     </main>
   );
