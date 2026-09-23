@@ -11,7 +11,7 @@ const cwd = '/tmp/ccui-smoke-ssh-drop';
 await runSsh(target, `mkdir -p ${shq(cwd)}`);
 const rt = new SdkRuntime(sshTransport({ target }));
 const sessionId = randomUUID();
-const live = await rt.open({ cwd, sessionId, model: 'haiku', effort: 'low', lean: true, routing: false, maxBudgetUsd: 0.5, permissionMode: 'default' });
+const live = await rt.open({ cwd, sessionId, model: 'haiku', effort: 'low', lean: true, routing: false, permissionMode: 'default' });
 live.send('Responda direto no chat, sem usar nenhuma ferramenta: escreva um poema de 60 versos numerados sobre o mar.');
 
 let deltas = 0, killed = false, sawExit = false;

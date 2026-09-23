@@ -109,7 +109,6 @@ class Live implements LiveSession {
         ...(resume ? { resume: o.sessionId } : { sessionId: o.sessionId }),
         model: o.model,
         effort: o.effort,
-        maxBudgetUsd: o.maxBudgetUsd,
         permissionMode: o.permissionMode,
         allowDangerouslySkipPermissions: o.permissionMode === 'bypassPermissions',
         systemPrompt: o.routing

@@ -19,7 +19,7 @@ const sessionId = randomUUID();
 line('sessões antes:', (await rt.listSessions(cwd)).length);
 
 const run = async (text: string) => {
-  const live = await rt.open({ cwd, sessionId, model: 'haiku', effort: 'low', lean: true, routing: false, maxBudgetUsd: 0.5, permissionMode: 'default' });
+  const live = await rt.open({ cwd, sessionId, model: 'haiku', effort: 'low', lean: true, routing: false, permissionMode: 'default' });
   live.send(text);
   for await (const ev of live.events) {
     if (ev.type === 'message.completed' || ev.type === 'turn.completed' || ev.type === 'error') line('  ev:', JSON.stringify(ev).slice(0, 150));

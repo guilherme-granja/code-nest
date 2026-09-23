@@ -83,7 +83,7 @@ export function mapMessage(m: SDKMessage): EventBody[] {
       if (m.subtype !== 'success' || m.is_error) {
         out.push({
           type: 'error',
-          code: m.subtype === 'error_max_budget_usd' ? 'budget' : 'runtime',
+          code: 'runtime',
           message: m.subtype === 'success' ? m.result : m.errors.join('; '),
         });
       }

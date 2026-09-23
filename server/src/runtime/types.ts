@@ -27,7 +27,7 @@ export interface Transport {
   waitSessionIdle(sessionId: string, timeoutMs: number): Promise<void>;
 }
 export interface OpenOptions {
-  cwd: string; sessionId: string; model: Model; effort: Effort; lean: boolean; routing: boolean; maxBudgetUsd: number; permissionMode: 'default' | 'plan' | 'bypassPermissions';
+  cwd: string; sessionId: string; model: Model; effort: Effort; lean: boolean; routing: boolean; permissionMode: 'default' | 'plan' | 'bypassPermissions';
 }
 export interface LiveSession {
   send(text: string, attachments?: string[]): void;

@@ -65,7 +65,7 @@ export async function openStore() {
   const p = (n: string) => path.join(DATA_DIR, n);
   return {
     config: await JsonFile.open<Config>(p('config.json'), {
-      version: 1, lastConnectionId: null, defaults: { model: 'sonnet', effort: 'medium', maxBudgetUsd: 2 }, connections: [LOCAL],
+      version: 1, lastConnectionId: null, defaults: { model: 'sonnet', effort: 'medium' }, connections: [LOCAL],
     }),
     projects: await JsonFile.open<{ version: 1; projects: Project[] }>(p('projects.json'), { version: 1, projects: [] }),
     sessions: await JsonFile.open<{ version: 1; sessions: SessionMeta[] }>(p('sessions.json'), { version: 1, sessions: [] }),

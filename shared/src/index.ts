@@ -18,7 +18,7 @@ export interface SessionMeta {
 export interface Config {
   version: 1;
   lastConnectionId: string | null;
-  defaults: { model: Model; effort: Effort; maxBudgetUsd: number };
+  defaults: { model: Model; effort: Effort };
   connections: Connection[];
 }
 export interface SessionRow { sessionId: string; name: string; lastModified: number; live: boolean; tags: string[]; favorite: boolean; archived: boolean }
@@ -33,8 +33,8 @@ const name = (max: number) => z.string().trim().min(1).max(max);
 export const createProjectBody = z.object({ name: name(80), path: z.string().min(1).max(1024), lean: z.boolean().default(false), connectionId: z.string().min(1).default('local') });
 export const createConnectionBody = z.object({ target: z.string().min(1).max(255), label: name(80).optional(), claudePath: z.string().max(255).optional() });
 export const patchProjectBody = z.object({ name: name(80).optional(), lean: z.boolean().optional(), routing: z.boolean().optional(), bypass: z.boolean().optional(), model: modelSchema.optional(), effort: effortSchema.optional() });
-export const patchConfigBody = z.object({ model: modelSchema.optional(), effort: effortSchema.optional(), maxBudgetUsd: z.number().positive().max(1000).optional() })
-  .refine((b) => b.model !== undefined || b.effort !== undefined || b.maxBudgetUsd !== undefined, { message: 'nada para alterar' });
+export const patchConfigBody = z.object({ model: modelSchema.optional(), effort: effortSchema.optional() })
+  .refine((b) => b.model !== undefined || b.effort !== undefined, { message: 'nada para alterar' });
 export const createSessionBody = z.object({ name: name(120), model: modelSchema.optional(), effort: effortSchema.optional(), routing: z.boolean().optional() });
 const tag = z.string().trim().toLowerCase().min(1).max(30).regex(/^[\p{L}\p{N}_-]+$/u);
 export const patchSessionBody = z.object({
@@ -67,7 +67,7 @@ export type EventBody =
   | { type: 'turn.completed'; totals: UsageTotals; inputTokens: number; outputTokens: number; cacheCreationTokens: number; cacheReadTokens: number; modelUsage: Record<string, ModelUsage> }
   | { type: 'shell.started'; id: string; command: string }
   | ({ type: 'shell.result'; id: string } & ShellResult)
-  | { type: 'error'; code: 'runtime' | 'budget' | 'exit'; message: string };
+  | { type: 'error'; code: 'runtime' | 'exit'; message: string };
 export type ClaudeEvent = EventBody & { sessionId: string; seq: number; ts: number };
 export interface HistoryItem { role: 'user' | 'assistant'; text: string }
 // acumulado da sessão (todas as execuções, inclusive antes de um resume); custo é ESTIMATIVA a preço de API (não é cobrança em plano de assinatura)

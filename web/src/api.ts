@@ -30,7 +30,7 @@ async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
 export const api = {
   state: () => req<{ config: Config; projects: Project[]; status: Record<string, ConnStatus> }>('GET', '/api/state'),
   setConnection: (connectionId: string) => req<void>('POST', '/api/last-connection', { connectionId }),
-  patchConfig: (b: Partial<{ model: Model; effort: Effort; maxBudgetUsd: number }>) => req<Config>('PATCH', '/api/config', b),
+  patchConfig: (b: Partial<{ model: Model; effort: Effort }>) => req<Config>('PATCH', '/api/config', b),
   addProject: (b: { name: string; path: string; lean: boolean; connectionId: string }) => req<Project>('POST', '/api/projects', b),
   testConnection: (b: { target: string; claudePath?: string }) => req<{ ok: boolean; version?: string; warning?: string; error?: string }>('POST', '/api/connections/test', b),
   addConnection: (b: { target: string; label?: string; claudePath?: string }) => req<{ connection: Connection; warning?: string }>('POST', '/api/connections', b),

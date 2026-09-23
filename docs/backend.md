@@ -46,7 +46,7 @@ Split between `routing.ts` (heuristic + classification prompt) and `sdk-runtime.
 ## Configuration
 
 - Store lives at `~/.claude-code-ui/{config,projects,sessions}.json` (or `CCUI_DATA_DIR`), atomic writes with `.bak` backup (`store.ts:26`).
-- Config hierarchy: `SessionMeta.model/effort` (per session) -> `Project.model/effort/routing/bypass/lean` (per project) -> `Config.defaults` (global, `model:'sonnet', effort:'medium', maxBudgetUsd:2`).
+- Config hierarchy: `SessionMeta.model/effort` (per session) -> `Project.model/effort/routing/bypass/lean` (per project) -> `Config.defaults` (global, `model:'sonnet', effort:'medium'`).
 - `permissionMode`: `default | plan | bypassPermissions`, derived from `project.bypass` in `domain.ts:18`.
 
 ## Error handling

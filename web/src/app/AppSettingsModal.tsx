@@ -7,23 +7,17 @@ import { ServerForm } from '../features/connect/ServerForm';
 const field = 'w-full rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-xs text-zinc-200 outline-none focus:border-zinc-700';
 const section = 'mb-1.5 font-mono text-[10px] font-medium uppercase tracking-wider text-zinc-500';
 
-// Configuração da aplicação: padrões globais (model/effort/limite de gasto) e servidores remotos — o que não é
+// Configuração da aplicação: padrões globais (model/effort) e servidores remotos — o que não é
 // por-projeto, mora aqui. Substitui o antigo botão "+ Nova sessão" no rodapé da sidebar (nova sessão já é
 // alcançável via Ctrl+K e pelo "+" de cada projeto).
 export function AppSettingsModal({ onClose }: { onClose: () => void }) {
   const { config, reloadProjects } = useApp();
   const d = config?.defaults;
-  const [budget, setBudget] = useState(String(d?.maxBudgetUsd ?? ''));
   const [addingServer, setAddingServer] = useState(false);
   const [err, setErr] = useState('');
 
-  const patch = async (b: Partial<{ model: Model; effort: Effort; maxBudgetUsd: number }>) => {
+  const patch = async (b: Partial<{ model: Model; effort: Effort }>) => {
     try { await api.patchConfig(b); await reloadProjects(); setErr(''); } catch (e) { setErr((e as Error).message); }
-  };
-  const commitBudget = () => {
-    const n = Number(budget);
-    if (!Number.isFinite(n) || n <= 0) { setErr('limite deve ser um número maior que zero'); return; }
-    void patch({ maxBudgetUsd: n });
   };
 
   if (!d || !config) return null;
@@ -47,12 +41,6 @@ export function AppSettingsModal({ onClose }: { onClose: () => void }) {
               </select>
             </label>
           </div>
-          <label className="block text-xs text-zinc-400">Limite de gasto por sessão (USD)
-            <div className="mt-1 flex gap-2">
-              <input className={field} type="number" min="0.01" step="0.5" value={budget} onChange={(e) => setBudget(e.target.value)} onBlur={commitBudget} onKeyDown={(e) => e.key === 'Enter' && commitBudget()} />
-            </div>
-            <span className="mt-1 block text-[11px] leading-relaxed text-zinc-500">Custo acumulado da sessão (todas as mensagens, desde que o processo ficou aberto) — passado disso, o turno é abortado.</span>
-          </label>
           {err && <div className="text-xs text-rose-400">{err}</div>}
         </div>
 

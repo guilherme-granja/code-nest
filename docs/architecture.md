@@ -16,7 +16,7 @@ Code Nest is a web app (browser) that opens and talks to Claude Code sessions, l
 Abstraction in `server/src/runtime/types.ts`:
 
 - `Transport` — everything that differs between local and remote execution: `spawn`, `listSessions`, `history`, `usage`, `shell`, `git`, `waitSessionIdle`. Implementations: `local-transport.ts` and `ssh-transport.ts`.
-- `OpenOptions` — `cwd, sessionId, model, effort, lean, routing, maxBudgetUsd, permissionMode`.
+- `OpenOptions` — `cwd, sessionId, model, effort, lean, routing, permissionMode`.
 - `LiveSession` — an open session: `send`, `interrupt`, `answerPermission`, `setModel`, `close`, `events` (AsyncIterable of `EventBody`).
 - `ClaudeRuntime` — the facade used by `SessionHub`: `open`, `listSessions`, `history`, `usage`, `shell`, `commands`, `classify`, `settle`. Single implementation `SdkRuntime` (`sdk-runtime.ts`), parameterized by `Transport` — local and SSH use the same `SdkRuntime` class, only the `Transport` changes.
 

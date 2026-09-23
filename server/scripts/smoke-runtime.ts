@@ -5,7 +5,7 @@ import { localTransport } from '../src/runtime/local-transport';
 import { SdkRuntime } from '../src/runtime/sdk-runtime';
 
 const rt = new SdkRuntime(localTransport);
-const live = await rt.open({ cwd: tmpdir(), sessionId: randomUUID(), model: 'haiku', effort: 'low', lean: true, routing: false, maxBudgetUsd: 0.5, permissionMode: 'default' });
+const live = await rt.open({ cwd: tmpdir(), sessionId: randomUUID(), model: 'haiku', effort: 'low', lean: true, routing: false, permissionMode: 'default' });
 const prompts = ['diga apenas: um', 'crie o arquivo smoke.txt com o conteúdo abc usando a ferramenta Write'];
 let turns = 0;
 live.send(prompts[0]);

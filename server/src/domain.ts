@@ -14,7 +14,6 @@ export function openSpecFor(store: Store, sessionId: string): OpenSpec {
     effort: meta.effort ?? project.effort ?? d.effort,
     lean: project.lean,
     routing: meta.routing ?? project.routing ?? false,
-    maxBudgetUsd: d.maxBudgetUsd,
     permissionMode: project.bypass ? 'bypassPermissions' : 'default',
   };
 }
