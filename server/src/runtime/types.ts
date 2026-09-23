@@ -1,5 +1,5 @@
 import type { SpawnedProcess, SpawnOptions } from '@anthropic-ai/claude-agent-sdk';
-import type { Effort, EventBody, HistoryItem, Model, ModelUsage, ShellResult, SlashCommandInfo, UsageTotals } from '@ccui/shared';
+import type { DirEntry, Effort, EventBody, HistoryItem, Model, ModelUsage, ShellResult, SlashCommandInfo, UsageTotals } from '@ccui/shared';
 
 export interface SessionInfo { sessionId: string; summary: string; customTitle?: string; firstPrompt?: string; lastModified: number }
 
@@ -8,7 +8,7 @@ export interface Transport {
   spawn(o: SpawnOptions, onStderr: (chunk: string) => void): SpawnedProcess;
   isDirectory(path: string): Promise<boolean>;
   /** lista o conteúdo de um diretório; path null = resolve e lista o $HOME da conexão. null de volta = não existe/sem permissão/falha */
-  listDir(path: string | null): Promise<{ path: string; entries: { name: string; isDir: boolean }[] } | null>;
+  listDir(path: string | null): Promise<{ path: string; entries: DirEntry[] } | null>;
   listSessions(cwd: string): Promise<SessionInfo[]>;
   history(sessionId: string, cwd: string): Promise<HistoryItem[]>;
   sessionExists(sessionId: string, cwd: string): Promise<boolean>;

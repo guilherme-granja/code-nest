@@ -24,6 +24,7 @@ export interface Config {
 export interface SessionRow { sessionId: string; name: string; lastModified: number; live: boolean; tags: string[]; favorite: boolean; archived: boolean }
 export interface SlashCommandInfo { name: string; description: string; argumentHint: string; aliases?: string[]; builtin: boolean }
 export interface GitInfo { branch: string | null; ahead: number; behind: number; changed: number; untracked: number }
+export interface DirEntry { name: string; isDir: boolean }
 export const LOCAL: Connection = { id: 'local', kind: 'local', label: 'Local' };
 
 const name = (max: number) => z.string().trim().min(1).max(max);

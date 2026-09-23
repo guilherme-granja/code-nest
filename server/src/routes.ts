@@ -91,6 +91,22 @@ export function buildApi({ store, hub, conns }: Deps) {
     return c.body(null, 204);
   });
 
+  // navega o filesystem da conexão (pastas locais/SSH) pra escolher caminho de projeto sem digitar
+  api.get('/connections/:id/browse', async (c) => {
+    let conn: ReturnType<Connections['get']>;
+    try { conn = conns.get(c.req.param('id')); } catch { return c.json({ error: 'conexão desconhecida' }, 404); }
+    const raw = c.req.query('path');
+    let p: string | null = null;
+    if (raw !== undefined) {
+      p = path.posix.normalize(raw);
+      if (!p.startsWith('/') || /[\u0000-\u001f]/.test(p)) return bad(c, 'caminho inválido');
+    }
+    const r = await conn.transport.listDir(p);
+    if (!r) return c.json({ error: 'não foi possível listar este caminho' }, 404);
+    const kind = c.req.query('kind') === 'all' ? 'all' : 'dir';
+    return c.json({ path: r.path, entries: kind === 'dir' ? r.entries.filter((e) => e.isDir) : r.entries });
+  });
+
   api.post('/projects', async (c) => {
     const b = await body(c, createProjectBody);
     if (!b) return bad(c, 'dados inválidos');
