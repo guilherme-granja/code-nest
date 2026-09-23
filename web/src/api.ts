@@ -1,4 +1,4 @@
-import type { Config, ConnStatus, Connection, DirEntry, Effort, GitInfo, Model, Project, SessionRow, SlashCommandInfo } from '@ccui/shared';
+import type { Config, ConnStatus, Connection, DirEntry, Effort, GitInfo, Model, Project, ProjectUsageView, SessionRow, SlashCommandInfo, TodayUsage } from '@ccui/shared';
 
 const KEY = 'ccui-token';
 let token: string | null = null;
@@ -42,6 +42,8 @@ export const api = {
   patchSession: (sid: string, projectId: string, b: { name?: string; favorite?: boolean; archived?: boolean; tags?: string[] }) => req<void>('PATCH', `/api/sessions/${sid}`, { projectId, ...b }),
   commands: (pid: string) => req<SlashCommandInfo[]>('GET', `/api/projects/${pid}/commands`),
   git: (pid: string) => req<GitInfo | null>('GET', `/api/projects/${pid}/git`),
+  usageToday: () => req<TodayUsage>('GET', '/api/usage/today'),
+  projectUsage: (id: string) => req<ProjectUsageView>('GET', `/api/projects/${id}/usage`),
   browse: (connectionId: string, path: string | null, kind: 'dir' | 'all' = 'dir') =>
     req<{ path: string; entries: DirEntry[] }>('GET', `/api/connections/${connectionId}/browse?${path ? `path=${encodeURIComponent(path)}&` : ''}kind=${kind}`),
 };
