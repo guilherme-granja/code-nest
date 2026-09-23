@@ -169,6 +169,25 @@ export function buildApi({ store, hub, conns }: Deps) {
     return c.json(await listProjectSessions(store, conns.get(p.connectionId).runtime, hub, p));
   });
 
+  // custo acumulado do projeto (todas as sessões) + últimas 5 com custo individual (reusa Transport.usage(), já existente)
+  api.get('/projects/:id/usage', async (c) => {
+    const p = project(c.req.param('id'));
+    if (!p) return c.json({ error: 'projeto desconhecido' }, 404);
+    const rt = conns.get(p.connectionId);
+    const disk = await rt.runtime.listSessions(p.path).catch(() => []);
+    const metas = new Map(store.sessions.data.sessions.filter((s) => s.projectId === p.id).map((m) => [m.sessionId, m]));
+    let totalCostUsd = 0;
+    const rows = await Promise.all(disk.map(async (d) => {
+      const u = await rt.transport.usage(d.sessionId, p.path).catch(() => null);
+      const costUsd = u?.totals.costUsd ?? 0;
+      totalCostUsd += costUsd;
+      const meta = metas.get(d.sessionId);
+      return { sessionId: d.sessionId, name: meta?.name ?? d.customTitle ?? d.summary ?? '(sem título)', lastModified: d.lastModified, costUsd };
+    }));
+    rows.sort((a, b) => b.lastModified - a.lastModified);
+    return c.json({ totalCostUsd, sessions: rows.slice(0, 5) });
+  });
+
   // comandos `/` do projeto para o autocomplete; cache de 5 min por (projeto, lean); falha => lista vazia (a UI tenta de novo depois)
   const cmdCache = new Map<string, { at: number; list: SlashCommandInfo[] }>();
   const cmdInflight = new Map<string, Promise<SlashCommandInfo[]>>();
