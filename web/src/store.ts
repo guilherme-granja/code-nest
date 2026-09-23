@@ -42,6 +42,7 @@ interface App {
   ui: Ui;
   layout: Layout;
   commands: Record<string, SlashCommandInfo[]>; // chave "<projeto>:<lean>"
+  attachments: Record<string, string[]>; // sessionId -> caminhos absolutos ainda não enviados
   start(): Promise<void>;
   reloadProjects(): Promise<void>;
   refreshRows(projectId: string): Promise<void>;
@@ -54,6 +55,8 @@ interface App {
   setSidebarW(w: number): void;
   toggleCollapsed(key: string): void;
   ensureCommands(projectId: string): Promise<void>;
+  addAttachment(sessionId: string, path: string): void;
+  removeAttachment(sessionId: string, path: string): void;
   toggleNotify(): Promise<void>;
   send(text: string): void;
   interrupt(): void;
@@ -97,7 +100,7 @@ export const useApp = create<App>((set, get) => {
   return {
     tokenMissing: false, up: false, config: null, projects: [], rows: {}, active: null, tabs: [], chats: {}, status: {},
     attention: {}, notifyOn: notifyEnabled(), ui: { palette: false, help: false, newSession: false, newFor: null, term: false, settingsFor: null, appSettings: false },
-    layout: loadLayout(), commands: {},
+    layout: loadLayout(), commands: {}, attachments: {},
 
     async start() {
       if (started) return;
@@ -211,7 +214,20 @@ export const useApp = create<App>((set, get) => {
 
     send(text) {
       const a = get().active;
-      if (a) sock?.send({ type: 'send', sessionId: a.sessionId, text });
+      if (!a) return;
+      const files = get().attachments[a.sessionId] ?? [];
+      sock?.send({ type: 'send', sessionId: a.sessionId, text, attachments: files.length ? files : undefined });
+      if (files.length) set((s) => ({ attachments: { ...s.attachments, [a.sessionId]: [] } }));
+    },
+    addAttachment(sessionId, p) {
+      set((s) => {
+        const cur = s.attachments[sessionId] ?? [];
+        if (cur.length >= 10 || cur.includes(p)) return s;
+        return { attachments: { ...s.attachments, [sessionId]: [...cur, p] } };
+      });
+    },
+    removeAttachment(sessionId, p) {
+      set((s) => ({ attachments: { ...s.attachments, [sessionId]: (s.attachments[sessionId] ?? []).filter((x) => x !== p) } }));
     },
     interrupt() {
       const a = get().active;
