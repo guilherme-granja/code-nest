@@ -38,6 +38,14 @@ export function sshTransport(conn: { target: string; claudePath?: string }): Tra
       return { path: resolved, entries };
     },
 
+    async readFile(p, maxBytes) {
+      const sizeR = await sh(`stat -c %s ${shq(p)} 2>/dev/null`);
+      const size = Number(sizeR.stdout.trim());
+      if (sizeR.code !== 0 || !Number.isFinite(size) || size > maxBytes) return null;
+      const r = await sh(`base64 -w0 ${shq(p)}`, 30_000);
+      return r.code === 0 ? r.stdout.trim() : null;
+    },
+
     async listSessions(cwd) {
       const r = await sh(`cd ${dir(cwd)} 2>/dev/null && stat -c '%Y %n' -- *.jsonl 2>/dev/null`);
       const files = r.stdout.split('\n').flatMap((l) => {

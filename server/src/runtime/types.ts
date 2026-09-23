@@ -9,6 +9,8 @@ export interface Transport {
   isDirectory(path: string): Promise<boolean>;
   /** lista o conteúdo de um diretório; path null = resolve e lista o $HOME da conexão. null de volta = não existe/sem permissão/falha */
   listDir(path: string | null): Promise<{ path: string; entries: DirEntry[] } | null>;
+  /** lê um arquivo inteiro em base64; null se não existe/não é arquivo/sem permissão/maior que maxBytes */
+  readFile(path: string, maxBytes: number): Promise<string | null>;
   listSessions(cwd: string): Promise<SessionInfo[]>;
   history(sessionId: string, cwd: string): Promise<HistoryItem[]>;
   sessionExists(sessionId: string, cwd: string): Promise<boolean>;

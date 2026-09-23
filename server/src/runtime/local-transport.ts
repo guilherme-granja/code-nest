@@ -30,6 +30,14 @@ export const localTransport: Transport = {
     } catch { return null; }
   },
 
+  async readFile(p, maxBytes) {
+    try {
+      const st = await fs.stat(p);
+      if (!st.isFile() || st.size > maxBytes) return null;
+      return (await fs.readFile(p)).toString('base64');
+    } catch { return null; }
+  },
+
   async listSessions(cwd) {
     const list = await listSessions({ dir: cwd });
     return list.map((s) => ({ sessionId: s.sessionId, summary: s.summary, customTitle: s.customTitle, firstPrompt: s.firstPrompt, lastModified: s.lastModified }));
