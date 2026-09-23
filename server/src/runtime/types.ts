@@ -1,5 +1,6 @@
 import type { SpawnedProcess, SpawnOptions } from '@anthropic-ai/claude-agent-sdk';
 import type { DirEntry, Effort, EventBody, HistoryItem, Model, ModelUsage, ShellResult, SlashCommandInfo, UsageTotals } from '@ccui/shared';
+import type { CostCheckpoint } from './jsonl';
 
 export interface SessionInfo { sessionId: string; summary: string; customTitle?: string; firstPrompt?: string; lastModified: number }
 
@@ -16,6 +17,8 @@ export interface Transport {
   sessionExists(sessionId: string, cwd: string): Promise<boolean>;
   /** custo/tokens acumulados da sessão (último `cost-state` do jsonl), ou null se ainda não há */
   usage(sessionId: string, cwd: string): Promise<{ totals: UsageTotals; modelUsage: Record<string, ModelUsage> } | null>;
+  /** todos os checkpoints de custo num trecho generoso (8 MB) do fim do jsonl; null se a sessão não existe/sem leitura */
+  costCheckpoints(sessionId: string, cwd: string): Promise<CostCheckpoint[] | null>;
   /** modo shell (`!cmd`): executa o comando DIGITADO PELO USUÁRIO no diretório do projeto (local ou remoto), com timeout e limite de saída */
   shell(cwd: string, command: string): Promise<ShellResult>;
   /** saída de `git status --porcelain=v2 --branch` do diretório, ou null (não é repositório / sem resposta) */

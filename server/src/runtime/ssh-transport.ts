@@ -1,7 +1,7 @@
 import { claudeExpr, DEFAULT_CLAUDE_PATH, encodeCwd, explainSshError, runSsh, SESSION_ID_RE, shq, sshArgv } from '../ssh-util';
 import { spawnManaged } from './child';
 import { SHELL_MAX_OUTPUT, SHELL_TIMEOUT_MS } from './local-transport';
-import { firstPrompt, lastCostState, parseHistory } from './jsonl';
+import { costCheckpoints, firstPrompt, lastCostState, parseHistory } from './jsonl';
 import type { Transport } from './types';
 
 const LIST_LIMIT = 50;
@@ -87,6 +87,12 @@ export function sshTransport(conn: { target: string; claudePath?: string }): Tra
         output: r.stdout.slice(0, SHELL_MAX_OUTPUT) + (timedOut ? `\n[tempo limite de ${SHELL_TIMEOUT_MS / 1000} s: comando encerrado]` : ''),
         exitCode: r.code, truncated: r.stdout.length > SHELL_MAX_OUTPUT,
       };
+    },
+
+    async costCheckpoints(id, cwd) {
+      if (!SESSION_ID_RE.test(id)) return null;
+      const r = await sh(`tail -c 8388608 ${dir(cwd)}/${id}.jsonl 2>/dev/null`, 30_000);
+      return r.code === 0 ? costCheckpoints(r.stdout) : null;
     },
 
     async usage(id, cwd) {

@@ -7,7 +7,7 @@ import type { HistoryItem } from '@ccui/shared';
 import { spawnManaged } from './child';
 import { encodeCwd, SESSION_ID_RE } from '../ssh-util';
 import { blockText, cleanTags } from './events';
-import { lastCostState } from './jsonl';
+import { costCheckpoints, lastCostState } from './jsonl';
 import type { Transport } from './types';
 
 export { reportOrphans } from './child';
@@ -76,6 +76,20 @@ export const localTransport: Transport = {
   },
 
   // lê o fim do jsonl (o `cost-state` é regravado periodicamente); aumenta o trecho até achar
+  async costCheckpoints(sessionId, cwd) {
+    if (!SESSION_ID_RE.test(sessionId)) return null;
+    const file = path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(homedir(), '.claude'), 'projects', encodeCwd(cwd), `${sessionId}.jsonl`);
+    let fh;
+    try {
+      fh = await fs.open(file, 'r');
+      const { size } = await fh.stat();
+      const len = Math.min(8 * 1024 * 1024, size);
+      const buf = Buffer.alloc(len);
+      await fh.read(buf, 0, len, size - len);
+      return costCheckpoints(buf.toString('utf8'));
+    } catch { return null; } finally { await fh?.close(); }
+  },
+
   async usage(sessionId, cwd) {
     if (!SESSION_ID_RE.test(sessionId)) return null;
     const file = path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(homedir(), '.claude'), 'projects', encodeCwd(cwd), `${sessionId}.jsonl`);
