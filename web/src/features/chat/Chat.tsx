@@ -73,7 +73,7 @@ function AttachedFilesPill({ sessionId, connectionId }: { sessionId: string; con
   const [open, setOpen] = useState(false);
   if (files.length === 0) return null;
   return (
-    <div className="relative">
+    <div className="relative flex justify-end border-b border-zinc-800/60 px-2 py-1.5">
       <button className="rounded-md border border-zinc-800/60 bg-zinc-900/50 px-2.5 py-1 font-mono text-xs text-zinc-400 hover:border-zinc-700" onClick={() => setOpen((o) => !o)}>
         {files.length} {files.length === 1 ? 'arquivo' : 'arquivos'}
       </button>
@@ -165,7 +165,6 @@ export function Chat() {
             <span className="text-zinc-600">·</span>
             <span>{fmtTokens(chat.totals.input + chat.totals.output)} tokens</span>
           </div>
-          <AttachedFilesPill sessionId={active.sessionId} connectionId={connId} />
           {!up && <span className="text-xs text-rose-400">desconectado…</span>}
           {busy && <button className="rounded-md border border-zinc-800 px-2.5 py-1 text-xs text-zinc-300 transition-colors hover:border-zinc-700 hover:bg-zinc-900" onClick={interrupt}>Pausar</button>}
           <button className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors ${ui.term ? 'border-zinc-700 bg-zinc-900 text-zinc-100' : 'border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-900'}`} title="Subagentes e comandos ! (Ctrl+J)" onClick={() => setUi({ term: !ui.term })}>Terminal</button>
@@ -213,17 +212,20 @@ export function Chat() {
 
       <div className="relative border-t border-zinc-800/70 bg-zinc-950 p-3">
         {menuOpen && <SlashMenu items={matches} sel={Math.min(sel, matches.length - 1)} lean={!!project?.lean} onPick={pick} onHover={setSel} />}
-        <div className="flex items-end gap-2">
-          <AttachMenu sessionId={active.sessionId} connectionId={connId} />
+        <div className="flex flex-col rounded-xl border border-zinc-800 bg-zinc-900/90 transition-colors focus-within:border-zinc-700">
+          <AttachedFilesPill sessionId={active.sessionId} connectionId={connId} />
           <textarea
             ref={input}
-            className="h-20 min-w-0 flex-1 resize-none rounded-xl border border-zinc-800 bg-zinc-900/90 p-3 text-sm text-zinc-100 outline-none transition-colors duration-150 placeholder:text-zinc-500 focus:border-zinc-700 disabled:opacity-50"
+            className="min-h-20 max-h-[50vh] w-full resize-y rounded-t-xl bg-transparent p-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 disabled:opacity-50"
             placeholder={busy ? 'Aguarde a resposta…' : 'Mensagem… ("/" comandos · "!" shell · Enter envia · Shift+Enter quebra linha)'}
             value={text}
             disabled={busy || !up}
             onChange={(e) => { setText(e.target.value); setSel(0); setDismissed(false); }}
             onKeyDown={onKeyDown}
           />
+          <div className="flex items-center px-1 py-1">
+            <AttachMenu sessionId={active.sessionId} connectionId={connId} />
+          </div>
         </div>
       </div>
     </main>
