@@ -6,6 +6,7 @@ import { NewSessionModal } from '../features/sessions/NewSessionModal';
 import { Palette } from '../features/sessions/Palette';
 import { Shortcuts } from '../features/sessions/Shortcuts';
 import { Tabs } from '../features/sessions/Tabs';
+import { SpendDashboard } from '../features/spend/SpendDashboard';
 import { useApp } from '../store';
 
 const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
@@ -40,8 +41,7 @@ export function App() {
           <button className="flex w-8 shrink-0 items-start justify-center border-r border-zinc-800 pt-3 text-zinc-500 hover:bg-zinc-900 hover:text-zinc-200" title="Mostrar barra lateral (Alt+L)" onClick={toggleSidebar}>»</button>
         )}
       <div className="flex min-w-0 flex-1 flex-col">
-        <Tabs />
-        <Chat />
+        {ui.spend ? <SpendDashboard onClose={() => setUi({ spend: false })} /> : (<><Tabs /><Chat /></>)}
       </div>
       {ui.newSession && <NewSessionModal onClose={() => setUi({ newSession: false, newFor: null })} />}
       {ui.palette && <Palette />}
