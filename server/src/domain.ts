@@ -13,7 +13,7 @@ export function openSpecFor(store: Store, sessionId: string): OpenSpec {
     model: meta.model ?? project.model ?? d.model,
     effort: meta.effort ?? project.effort ?? d.effort,
     lean: project.lean,
-    routing: project.routing ?? false,
+    routing: meta.routing ?? project.routing ?? false,
     maxBudgetUsd: d.maxBudgetUsd,
     permissionMode: project.bypass ? 'bypassPermissions' : 'default',
   };

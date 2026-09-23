@@ -180,7 +180,7 @@ export function buildApi({ store, hub, conns }: Deps) {
     const b = await body(c, createSessionBody);
     if (!p || !b) return bad(c, 'dados inválidos');
     const now = Date.now();
-    const meta: SessionMeta = { sessionId: randomUUID(), projectId: p.id, name: b.name, model: b.model, effort: b.effort, createdAt: now, lastUsedAt: now };
+    const meta: SessionMeta = { sessionId: randomUUID(), projectId: p.id, name: b.name, model: b.model, effort: b.effort, routing: b.routing, createdAt: now, lastUsedAt: now };
     store.sessions.data.sessions.push(meta);
     await store.sessions.save();
     return c.json(meta);

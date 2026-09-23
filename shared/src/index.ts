@@ -12,7 +12,7 @@ export interface Connection { id: string; kind: 'local' | 'ssh'; target?: string
 export type ConnStatus = 'up' | 'down' | 'reconnecting';
 export interface Project { id: string; name: string; connectionId: string; path: string; lean: boolean; routing?: boolean; bypass?: boolean; model?: Model; effort?: Effort }
 export interface SessionMeta {
-  sessionId: string; projectId: string; name?: string; model?: Model; effort?: Effort;
+  sessionId: string; projectId: string; name?: string; model?: Model; effort?: Effort; routing?: boolean;
   tags?: string[]; favorite?: boolean; archived?: boolean; createdAt: number; lastUsedAt: number;
 }
 export interface Config {
@@ -26,6 +26,8 @@ export interface SlashCommandInfo { name: string; description: string; argumentH
 export interface GitInfo { branch: string | null; ahead: number; behind: number; changed: number; untracked: number }
 export interface DirEntry { name: string; isDir: boolean }
 export const LOCAL: Connection = { id: 'local', kind: 'local', label: 'Local' };
+export interface TodayUsage { totalCostUsd: number; byModel: Record<string, number>; byProject: Record<string, number> }
+export interface ProjectUsageView { totalCostUsd: number; sessions: Array<{ sessionId: string; name: string; lastModified: number; costUsd: number }> }
 
 const name = (max: number) => z.string().trim().min(1).max(max);
 export const createProjectBody = z.object({ name: name(80), path: z.string().min(1).max(1024), lean: z.boolean().default(false), connectionId: z.string().min(1).default('local') });
@@ -33,7 +35,7 @@ export const createConnectionBody = z.object({ target: z.string().min(1).max(255
 export const patchProjectBody = z.object({ name: name(80).optional(), lean: z.boolean().optional(), routing: z.boolean().optional(), bypass: z.boolean().optional(), model: modelSchema.optional(), effort: effortSchema.optional() });
 export const patchConfigBody = z.object({ model: modelSchema.optional(), effort: effortSchema.optional(), maxBudgetUsd: z.number().positive().max(1000).optional() })
   .refine((b) => b.model !== undefined || b.effort !== undefined || b.maxBudgetUsd !== undefined, { message: 'nada para alterar' });
-export const createSessionBody = z.object({ name: name(120), model: modelSchema.optional(), effort: effortSchema.optional() });
+export const createSessionBody = z.object({ name: name(120), model: modelSchema.optional(), effort: effortSchema.optional(), routing: z.boolean().optional() });
 const tag = z.string().trim().toLowerCase().min(1).max(30).regex(/^[\p{L}\p{N}_-]+$/u);
 export const patchSessionBody = z.object({
   projectId: z.string().min(1),
