@@ -63,8 +63,12 @@ function TurnSummary({ modelUsage, bypass }: { modelUsage: Record<string, ModelU
   );
 }
 
+const NO_ATTACHMENTS: string[] = [];
+
 function AttachedFilesPill({ sessionId, connectionId }: { sessionId: string; connectionId: string }) {
-  const files = useApp((s) => s.attachments[sessionId] ?? []);
+  // referência estável quando não há anexos: um array novo aqui faz o useSyncExternalStore do zustand nunca "assentar"
+  // (getSnapshot muda de identidade a cada chamada) -> loop infinito de re-render (React #185)
+  const files = useApp((s) => s.attachments[sessionId] ?? NO_ATTACHMENTS);
   const removeAttachment = useApp((s) => s.removeAttachment);
   const [open, setOpen] = useState(false);
   if (files.length === 0) return null;
