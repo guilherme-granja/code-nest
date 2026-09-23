@@ -39,7 +39,7 @@ export interface CostCheckpoint { ts: number; totals: UsageTotals; modelUsage: R
 // cada cost-state associado ao timestamp da última mensagem (user/assistant) vista antes dele no arquivo
 export function costCheckpoints(jsonlTail: string): CostCheckpoint[] {
   const out: CostCheckpoint[] = [];
-  let lastTs = 0;
+  let lastTs: number | null = null;
   for (const line of jsonlTail.split('\n')) {
     if (!line) continue;
     let e: { type?: string; timestamp?: string; totalCostUSD?: number; modelUsage?: Parameters<typeof sumUsage>[0] };
@@ -47,7 +47,9 @@ export function costCheckpoints(jsonlTail: string): CostCheckpoint[] {
     if ((e.type === 'user' || e.type === 'assistant') && e.timestamp) {
       const t = Date.parse(e.timestamp);
       if (Number.isFinite(t)) lastTs = t;
-    } else if (e.type === 'cost-state') {
+    } else if (e.type === 'cost-state' && lastTs !== null) {
+      // sem timestamp real visto ainda (1ª linha da janela cortada bem no meio): não dá pra datar este checkpoint,
+      // então descarta em vez de assumir época 0 (que sempre pareceria "antes de hoje" e viraria baseline errado)
       out.push({ ts: lastTs, totals: sumUsage(e.modelUsage, e.totalCostUSD ?? 0), modelUsage: rawModelUsage(e.modelUsage) });
     }
   }

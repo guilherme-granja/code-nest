@@ -60,7 +60,7 @@ export function ProjectSpendView({ projectId, onBack, onClose }: { projectId: st
                 <span className="flex shrink-0 items-center gap-2 font-mono text-xs text-zinc-400"><span>{ago(s.lastModified)}</span><span>${s.costUsd.toFixed(4)}</span></span>
               </li>
             ))}
-            {data.sessions.length === 0 && <li className="text-sm text-zinc-600">nenhuma sessão</li>}
+            {data.sessions.length === 0 && <li className="text-sm text-zinc-600">Nenhuma sessão</li>}
           </ul>
         </>
       )}
