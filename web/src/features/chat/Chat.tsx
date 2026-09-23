@@ -105,6 +105,7 @@ export function Chat() {
   const [dismissed, setDismissed] = useState(false);
   const end = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
+  const mirror = useRef<HTMLDivElement>(null);
 
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
   useEffect(() => { end.current?.scrollIntoView({ block: 'end' }); }, [chat?.items, chat?.pending.length]);
@@ -116,6 +117,9 @@ export function Chat() {
   const query = /^\/(\S*)$/.exec(text)?.[1];
   const matches = useMemo<SlashCommandInfo[]>(() => (query === undefined || !commands ? [] : matchCommands(commands, query)), [query, commands]);
   const menuOpen = !dismissed && matches.length > 0;
+  // leading "/name" once picked/finished (followed by whitespace, or menu closed): blue if it exists, red if not (visual only)
+  const slash = /^\/(\S+)(\s|$)/.exec(text);
+  const slashKnown = slash && commands && (slash[2] || !menuOpen) ? commands.some((c) => c.name === slash[1]) : undefined;
 
   if (!active || !chat) return <div className="flex flex-1 items-center justify-center text-zinc-500">Selecione ou crie uma sessão (Ctrl+K)</div>;
 
@@ -214,15 +218,25 @@ export function Chat() {
         {menuOpen && <SlashMenu items={matches} sel={Math.min(sel, matches.length - 1)} lean={!!project?.lean} onPick={pick} onHover={setSel} />}
         <div className="flex flex-col rounded-xl border border-zinc-800 bg-zinc-900/90 transition-colors focus-within:border-zinc-700">
           <AttachedFilesPill sessionId={active.sessionId} connectionId={connId} />
-          <textarea
-            ref={input}
-            className="min-h-20 max-h-[50vh] w-full resize-y rounded-t-xl bg-transparent p-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 disabled:opacity-50"
-            placeholder={busy ? 'Aguarde a resposta…' : 'Mensagem… ("/" comandos · "!" shell · Enter envia · Shift+Enter quebra linha)'}
-            value={text}
-            disabled={busy || !up}
-            onChange={(e) => { setText(e.target.value); setSel(0); setDismissed(false); }}
-            onKeyDown={onKeyDown}
-          />
+          <div className="relative">
+            {slash && slashKnown !== undefined && (
+              // mirror behind a transparent-text textarea, so only the command token gets colored
+              <div ref={mirror} aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words p-3 text-sm text-zinc-100 [scrollbar-gutter:stable]">
+                <span className={`underline underline-offset-2 ${slashKnown ? 'text-sky-400' : 'text-red-400'}`}>/{slash[1]}</span>
+                {text.slice(slash[1].length + 1)}{' '}
+              </div>
+            )}
+            <textarea
+              ref={input}
+              className={`block min-h-20 max-h-[50vh] w-full resize-y rounded-t-xl bg-transparent p-3 text-sm outline-none [scrollbar-gutter:stable] placeholder:text-zinc-500 disabled:opacity-50 ${slash && slashKnown !== undefined ? 'relative text-transparent caret-zinc-100' : 'text-zinc-100'}`}
+              placeholder={busy ? 'Aguarde a resposta…' : 'Mensagem… ("/" comandos · "!" shell · Enter envia · Shift+Enter quebra linha)'}
+              value={text}
+              disabled={busy || !up}
+              onChange={(e) => { setText(e.target.value); setSel(0); setDismissed(false); }}
+              onScroll={(e) => { if (mirror.current) mirror.current.scrollTop = e.currentTarget.scrollTop; }}
+              onKeyDown={onKeyDown}
+            />
+          </div>
           <div className="flex items-center px-1 py-1">
             <AttachMenu sessionId={active.sessionId} connectionId={connId} />
           </div>
