@@ -7,6 +7,8 @@ export interface SessionInfo { sessionId: string; summary: string; customTitle?:
 export interface Transport {
   spawn(o: SpawnOptions, onStderr: (chunk: string) => void): SpawnedProcess;
   isDirectory(path: string): Promise<boolean>;
+  /** lista o conteúdo de um diretório; path null = resolve e lista o $HOME da conexão. null de volta = não existe/sem permissão/falha */
+  listDir(path: string | null): Promise<{ path: string; entries: { name: string; isDir: boolean }[] } | null>;
   listSessions(cwd: string): Promise<SessionInfo[]>;
   history(sessionId: string, cwd: string): Promise<HistoryItem[]>;
   sessionExists(sessionId: string, cwd: string): Promise<boolean>;

@@ -22,6 +22,14 @@ export const localTransport: Transport = {
     try { return (await fs.stat(p)).isDirectory(); } catch { return false; }
   },
 
+  async listDir(p) {
+    const dir = p ?? homedir();
+    try {
+      const items = await fs.readdir(dir, { withFileTypes: true });
+      return { path: dir, entries: items.map((d) => ({ name: d.name, isDir: d.isDirectory() })) };
+    } catch { return null; }
+  },
+
   async listSessions(cwd) {
     const list = await listSessions({ dir: cwd });
     return list.map((s) => ({ sessionId: s.sessionId, summary: s.summary, customTitle: s.customTitle, firstPrompt: s.firstPrompt, lastModified: s.lastModified }));

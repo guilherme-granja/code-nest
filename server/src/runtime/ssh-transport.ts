@@ -27,6 +27,17 @@ export function sshTransport(conn: { target: string; claudePath?: string }): Tra
       return (await sh(`test -d ${shq(p)}`)).code === 0;
     },
 
+    async listDir(p) {
+      const cmd = p ? `cd ${shq(p)} 2>/dev/null && pwd && ls -1p .` : `cd "$HOME" && pwd && ls -1p .`;
+      const r = await sh(cmd);
+      if (r.code !== 0) return null;
+      const lines = r.stdout.split('\n');
+      const resolved = lines[0];
+      if (!resolved) return null;
+      const entries = lines.slice(1).filter(Boolean).map((l) => (l.endsWith('/') ? { name: l.slice(0, -1), isDir: true } : { name: l, isDir: false }));
+      return { path: resolved, entries };
+    },
+
     async listSessions(cwd) {
       const r = await sh(`cd ${dir(cwd)} 2>/dev/null && stat -c '%Y %n' -- *.jsonl 2>/dev/null`);
       const files = r.stdout.split('\n').flatMap((l) => {
