@@ -10,6 +10,7 @@ import { versionWarning, type Connections } from './connections';
 import { ensureMeta, listProjectSessions } from './domain';
 import { parseGitStatus } from './git';
 import type { SessionHub } from './hub';
+import { todayDelta } from './runtime/jsonl';
 import { checkConnection, validClaudePath, validTarget } from './ssh-util';
 import type { Store } from './store';
 
@@ -28,6 +29,28 @@ export function buildApi({ store, hub, conns }: Deps) {
   const bad = (c: Context, msg: string) => c.json({ error: msg }, 400);
 
   api.get('/state', (c) => c.json({ config: store.config.data, projects: projects(), status: conns.all() }));
+
+  // agregação de gastos de hoje, todas as conexões/projetos/sessões (janela de leitura limitada, ver Transport.costCheckpoints)
+  api.get('/usage/today', async (c) => {
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    let totalCostUsd = 0;
+    const byModel: Record<string, number> = {};
+    const byProject: Record<string, number> = {};
+    for (const p of projects()) {
+      const rt = conns.get(p.connectionId);
+      const sessions = await rt.runtime.listSessions(p.path).catch(() => []);
+      for (const s of sessions) {
+        const checkpoints = await rt.transport.costCheckpoints(s.sessionId, p.path).catch(() => null);
+        if (!checkpoints) continue;
+        const delta = todayDelta(checkpoints, todayStart.getTime());
+        if (delta.totals.costUsd <= 0) continue;
+        totalCostUsd += delta.totals.costUsd;
+        byProject[p.id] = (byProject[p.id] ?? 0) + delta.totals.costUsd;
+        for (const [model, u] of Object.entries(delta.modelUsage)) byModel[model] = (byModel[model] ?? 0) + u.costUsd;
+      }
+    }
+    return c.json({ totalCostUsd, byModel, byProject });
+  });
 
   // padrões globais (modelo/effort/limite de gasto por sessão), configuráveis em runtime pela UI de configurações
   api.patch('/config', async (c) => {
