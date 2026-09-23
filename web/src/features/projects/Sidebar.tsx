@@ -6,6 +6,7 @@ import { SIDEBAR_W_MAX, SIDEBAR_W_MIN, useApp } from '../../store';
 import { cycleTheme, getTheme, subscribeTheme, themeLabel } from '../../theme';
 import { AppSettingsModal } from '../../app/AppSettingsModal';
 import { IconSettings } from '../../lib/icons';
+import { FolderBrowserModal } from './FolderBrowserModal';
 import { ProjectSettingsModal } from './ProjectSettingsModal';
 
 const ago = (t: number) => {
@@ -95,6 +96,7 @@ export function Sidebar() {
   const [query, setQuery] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [browsing, setBrowsing] = useState(false);
   const [form, setForm] = useState({ name: '', path: '', lean: false, connectionId: 'local' });
   const [err, setErr] = useState('');
   const connections = config?.connections ?? [];
@@ -229,7 +231,10 @@ export function Sidebar() {
               {connections.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
             </select>
             <input className="w-full rounded bg-zinc-900 px-2 py-1" placeholder="Nome" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            <input className="w-full rounded bg-zinc-900 px-2 py-1" placeholder="/caminho/absoluto (no servidor escolhido)" value={form.path} onChange={(e) => setForm({ ...form, path: e.target.value })} />
+            <div className="flex gap-1">
+              <input className="min-w-0 flex-1 rounded bg-zinc-900 px-2 py-1" placeholder="/caminho/absoluto (no servidor escolhido)" value={form.path} onChange={(e) => setForm({ ...form, path: e.target.value })} />
+              <button className="shrink-0 rounded border border-zinc-700 px-2 text-xs text-zinc-300 hover:bg-zinc-800" onClick={() => setBrowsing(true)}>Procurar</button>
+            </div>
             <label className="flex items-center gap-2 text-xs text-zinc-400"><input type="checkbox" checked={form.lean} onChange={(e) => setForm({ ...form, lean: e.target.checked })} /> lean</label>
             {err && <div className="text-xs text-red-400">{err}</div>}
             <div className="flex gap-2">
@@ -245,6 +250,13 @@ export function Sidebar() {
         <IconSettings className="h-3.5 w-3.5" /> Configurações
       </button>
       {ui.settingsFor && <ProjectSettingsModal projectId={ui.settingsFor} onClose={() => setUi({ settingsFor: null })} />}
+      {browsing && (
+        <FolderBrowserModal
+          connectionId={form.connectionId}
+          onPick={(p) => { setForm({ ...form, path: p }); setBrowsing(false); }}
+          onClose={() => setBrowsing(false)}
+        />
+      )}
       {ui.appSettings && <AppSettingsModal onClose={() => setUi({ appSettings: false })} />}
     </aside>
   );
