@@ -4,7 +4,7 @@ import { api } from '../../api';
 
 // Navega o filesystem da conexão (local ou SSH) pra escolher uma pasta sem digitar o caminho.
 // path === null enquanto não carregou a 1ª vez (home da conexão); depois disso é sempre o caminho absoluto atual.
-export function FolderBrowserModal({ connectionId, onPick, onClose }: { connectionId: string; onPick: (path: string) => void; onClose: () => void }) {
+export function FolderBrowserModal({ connectionId, mode = 'dir', onPick, onClose }: { connectionId: string; mode?: 'dir' | 'file'; onPick: (path: string) => void; onClose: () => void }) {
   const [path, setPath] = useState<string | null>(null);
   const [entries, setEntries] = useState<DirEntry[]>([]);
   const [showHidden, setShowHidden] = useState(false);
@@ -14,7 +14,7 @@ export function FolderBrowserModal({ connectionId, onPick, onClose }: { connecti
 
   const load = (p: string | null) => {
     setLoading(true);
-    api.browse(connectionId, p, 'dir')
+    api.browse(connectionId, p, mode === 'file' ? 'all' : 'dir')
       .then((r) => { setPath(r.path); setEntries(r.entries); setErr(''); })
       .catch((e) => setErr((e as Error).message))
       .finally(() => setLoading(false));
@@ -30,7 +30,7 @@ export function FolderBrowserModal({ connectionId, onPick, onClose }: { connecti
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div className="flex max-h-[80vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]" onClick={(e) => e.stopPropagation()}>
         <div className="border-b border-zinc-800/80 p-4">
-          <h2 className="mb-2 text-sm font-semibold text-zinc-100">Escolher pasta</h2>
+          <h2 className="mb-2 text-sm font-semibold text-zinc-100">{mode === 'file' ? 'Escolher arquivo' : 'Escolher pasta'}</h2>
           <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap font-mono text-xs text-zinc-400">
             <button className="hover:text-zinc-200" onClick={() => load('/')}>/</button>
             {crumbs.map((seg, i) => {
@@ -54,13 +54,16 @@ export function FolderBrowserModal({ connectionId, onPick, onClose }: { connecti
                 <li><button className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs text-zinc-400 hover:bg-zinc-800/60" onClick={up}>..</button></li>
               )}
               {visible.length === 0 && <li className="px-2.5 py-1.5 text-xs text-zinc-600">Pasta vazia</li>}
-              {visible.map((e) => (
-                <li key={e.name}>
-                  <button className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs text-zinc-200 hover:bg-zinc-800/60" onClick={() => load(`${path === '/' ? '' : path}/${e.name}`)}>
-                    <span className="text-zinc-500">▸</span>{e.name}
-                  </button>
-                </li>
-              ))}
+              {visible.map((e) => {
+                const full = `${path === '/' ? '' : path}/${e.name}`;
+                return (
+                  <li key={e.name}>
+                    <button className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs text-zinc-200 hover:bg-zinc-800/60" onClick={() => (e.isDir ? load(full) : onPick(full))}>
+                      <span className="text-zinc-500">{e.isDir ? '▸' : '▪'}</span>{e.name}
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
@@ -81,7 +84,9 @@ export function FolderBrowserModal({ connectionId, onPick, onClose }: { connecti
           </label>
           <div className="flex justify-end gap-2 pt-1">
             <button className="px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200" onClick={onClose}>Cancelar</button>
-            <button className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-950 hover:bg-zinc-200 disabled:opacity-40" disabled={!path} onClick={() => path && onPick(path)}>Selecionar esta pasta</button>
+            {mode === 'dir' && (
+              <button className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-950 hover:bg-zinc-200 disabled:opacity-40" disabled={!path} onClick={() => path && onPick(path)}>Selecionar esta pasta</button>
+            )}
           </div>
         </div>
       </div>
