@@ -63,6 +63,9 @@ class Live implements LiveSession {
   private out = channel<EventBody>();
   readonly events: AsyncIterable<EventBody> = this.out;
   private pending = new Map<string, (allow: boolean, why?: string, updatedInput?: Record<string, unknown>) => void>();
+  // interrupt() enquanto attachmentBlocks() ainda lê o anexo (SSH lento): sem isto, o cancelamento não acha nada em
+  // andamento pra abortar (q.interrupt() vira no-op) e a mensagem entra mesmo assim quando a leitura terminar depois.
+  private cancelPendingSend: (() => void) | null = null;
   // task_id (interno do SDK) -> taskId (tool_use_id do Task tool) — só task_updated/task_progress precisam disto,
   // pois não trazem tool_use_id; populado quando task_started passa pelo loop em run().
   private taskIds = new Map<string, string>();
@@ -154,12 +157,19 @@ class Live implements LiveSession {
       this.input.push({ type: 'user', message: { role: 'user', content: text }, parent_tool_use_id: null });
       return;
     }
+    let cancelled = false;
+    this.cancelPendingSend = () => { cancelled = true; };
     void attachmentBlocks(this.transport, attachments).then((blocks) => {
+      if (cancelled) return; // usuário pediu interrupt() antes da leitura terminar: descarta, não envia
       const content: AttachBlock[] = [{ type: 'text', text }, ...blocks];
       this.input.push({ type: 'user', message: { role: 'user', content }, parent_tool_use_id: null });
     });
   }
-  async interrupt() { await this.q.interrupt(); }
+  async interrupt() {
+    this.cancelPendingSend?.();
+    this.cancelPendingSend = null;
+    await this.q.interrupt();
+  }
   async setModel(model: Model) { await this.q.setModel(model); }
   answerPermission(reqId: string, allow: boolean, updatedInput?: Record<string, unknown>) { this.pending.get(reqId)?.(allow, undefined, updatedInput); }
 
