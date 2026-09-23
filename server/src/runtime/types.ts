@@ -27,7 +27,7 @@ export interface OpenOptions {
   cwd: string; sessionId: string; model: Model; effort: Effort; lean: boolean; routing: boolean; maxBudgetUsd: number; permissionMode: 'default' | 'plan' | 'bypassPermissions';
 }
 export interface LiveSession {
-  send(text: string): void;
+  send(text: string, attachments?: string[]): void;
   interrupt(): Promise<void>;
   answerPermission(reqId: string, allow: boolean, updatedInput?: Record<string, unknown>): void;
   setModel(model: Model): Promise<void>;

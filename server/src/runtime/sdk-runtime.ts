@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import path from 'node:path';
 import { createSdkMcpServer, query, tool, type CanUseTool, type PermissionResult, type Query, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { EFFORTS, MODELS, type EventBody, type HistoryItem, type Model, type ModelUsage, type ShellResult, type SlashCommandInfo, type UsageTotals } from '@ccui/shared';
 import { z } from 'zod';
@@ -9,6 +10,21 @@ import type { ClaudeRuntime, LiveSession, OpenOptions, SessionInfo, Transport } 
 
 const PERMISSION_TIMEOUT_MS = 10 * 60_000;
 const CLASSIFY_TIMEOUT_MS = 15_000;
+
+type AttachBlock = { type: 'text'; text: string } | { type: 'image'; source: { type: 'base64'; media_type: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'; data: string } };
+const IMAGE_MIME: Record<string, 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' };
+const MAX_ATTACH_BYTES = 5 * 1024 * 1024;
+
+// imagem reconhecida e dentro do limite -> bloco de imagem real; qualquer outro caso -> só a referência do caminho (Claude já lê/abre com as próprias ferramentas)
+async function attachmentBlocks(transport: Transport, paths: string[]): Promise<AttachBlock[]> {
+  const blocks: AttachBlock[] = [];
+  for (const p of paths) {
+    const mime = IMAGE_MIME[path.extname(p).toLowerCase()];
+    const b64 = mime ? await transport.readFile(p, MAX_ATTACH_BYTES) : null;
+    blocks.push(b64 ? { type: 'image', source: { type: 'base64', media_type: mime, data: b64 } } : { type: 'text', text: `[Arquivo anexado: ${p}]` });
+  }
+  return blocks;
+}
 
 // lê a 1ª resposta de texto do assistente e fecha; usado pelo classificador descartável (sem persistir sessão)
 async function firstAssistantText(q: Query): Promise<string> {
@@ -70,7 +86,7 @@ class Live implements LiveSession {
       this.out.push({ type: 'permission.requested', reqId, toolName, input });
     });
 
-  constructor(o: OpenOptions, resume: boolean, transport: Transport) {
+  constructor(o: OpenOptions, resume: boolean, private transport: Transport) {
     const routingServer = o.routing ? createSdkMcpServer({
       name: 'routing',
       tools: [tool(
@@ -133,8 +149,15 @@ class Live implements LiveSession {
     }
   }
 
-  send(text: string) {
-    this.input.push({ type: 'user', message: { role: 'user', content: text }, parent_tool_use_id: null });
+  send(text: string, attachments: string[] = []) {
+    if (attachments.length === 0) {
+      this.input.push({ type: 'user', message: { role: 'user', content: text }, parent_tool_use_id: null });
+      return;
+    }
+    void attachmentBlocks(this.transport, attachments).then((blocks) => {
+      const content: AttachBlock[] = [{ type: 'text', text }, ...blocks];
+      this.input.push({ type: 'user', message: { role: 'user', content }, parent_tool_use_id: null });
+    });
   }
   async interrupt() { await this.q.interrupt(); }
   async setModel(model: Model) { await this.q.setModel(model); }

@@ -52,7 +52,7 @@ export function attachWs(server: Server, o: { port: number; token: string; hub: 
             const why = blockedSlash(m.text);
             if (why) { client.send({ type: 'error', code: 'blocked', message: why }); break; }
             touch(o.store, m.sessionId);
-            if ((await o.hub.send(m.sessionId, m.text)) === 'busy') client.send({ type: 'error', code: 'busy', message: 'sessão ocupada' });
+            if ((await o.hub.send(m.sessionId, m.text, m.attachments)) === 'busy') client.send({ type: 'error', code: 'busy', message: 'sessão ocupada' });
             break;
           }
           case 'interrupt': await o.hub.interrupt(m.sessionId); break;

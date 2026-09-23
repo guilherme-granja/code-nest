@@ -79,7 +79,7 @@ export const ClientMsg = z.discriminatedUnion('type', [
   z.object({ type: z.literal('auth'), token: z.string() }),
   z.object({ type: z.literal('attach'), sessionId: uuidSchema, projectId: z.string().min(1), afterSeq: z.number().int().nonnegative().optional() }),
   z.object({ type: z.literal('detach'), sessionId: uuidSchema }),
-  z.object({ type: z.literal('send'), sessionId: uuidSchema, text: z.string().min(1).max(200_000) }),
+  z.object({ type: z.literal('send'), sessionId: uuidSchema, text: z.string().min(1).max(200_000), attachments: z.array(z.string()).max(10).optional() }),
   z.object({ type: z.literal('interrupt'), sessionId: uuidSchema }),
   z.object({ type: z.literal('shell'), sessionId: uuidSchema, command: z.string().trim().min(1).max(10_000) }),
   z.object({ type: z.literal('permission'), sessionId: uuidSchema, reqId: z.string().min(1), allow: z.boolean(), updatedInput: z.record(z.string(), z.unknown()).optional() }),

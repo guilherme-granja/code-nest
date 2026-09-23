@@ -83,7 +83,7 @@ export class SessionHub {
   detach(c: Client, id: string) { this.entries.get(id)?.clients.delete(c); c.sessions.delete(id); }
   drop(c: Client) { for (const id of c.sessions) this.entries.get(id)?.clients.delete(c); c.sessions.clear(); }
 
-  async send(id: string, text: string): Promise<'ok' | 'busy'> {
+  async send(id: string, text: string, attachments: string[] = []): Promise<'ok' | 'busy'> {
     const spec = this.spec(id);
     const e = this.entry(id);
     if (e.state === 'running' || e.state === 'awaiting_permission') return 'busy';
@@ -105,7 +105,7 @@ export class SessionHub {
       this.emit(id, e, { type: 'model.routed', model });
     }
     this.emit(id, e, { type: 'user.message', text });
-    e.live.send(text);
+    e.live.send(text, attachments);
     return 'ok';
   }
 
