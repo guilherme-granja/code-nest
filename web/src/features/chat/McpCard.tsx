@@ -106,8 +106,13 @@ function ServerDetail({ s, busy, showTools, onBack, onTools, onAction }: {
         </tbody>
       </table>
       {s.error && <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap text-rose-300">{s.error}</pre>}
-      {s.status === 'needs-auth' && <div className="mt-1 text-amber-300/80">Authentication happens in the browser via OAuth: run <code>/mcp</code> once in the terminal <code>claude</code> to sign in.</div>}
+      {s.status === 'needs-auth' && (s.scope === 'claudeai'
+        ? <div className="mt-1 text-amber-300/80">claude.ai connectors are authenticated on claude.ai: sign in there, then click Reconnect.</div>
+        : <div className="mt-1 text-amber-300/80">Authentication happens in the browser via OAuth: run <code>/mcp</code> once in the terminal <code>claude</code> to sign in.</div>)}
       <div className="mt-2 flex flex-wrap gap-2">
+        {s.scope === 'claudeai' && s.status === 'needs-auth' && (
+          <a className={btn} href="https://claude.ai/settings/connectors" target="_blank" rel="noopener noreferrer">Open claude.ai connectors ↗</a>
+        )}
         {s.tools.length > 0 && <button className={btn} onClick={onTools}>{showTools ? 'Hide tools' : 'View tools'}</button>}
         {s.status !== 'disabled' && <button className={btn} disabled={busy} onClick={() => onAction('reconnect')}>Reconnect</button>}
         <button className={btn} disabled={busy} onClick={() => onAction(s.status === 'disabled' ? 'enable' : 'disable')}>{s.status === 'disabled' ? 'Enable' : 'Disable'}</button>
