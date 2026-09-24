@@ -6,8 +6,12 @@ export type Item =
   | { kind: 'tool'; toolUseId: string; name: string; input: unknown; output?: string; isError?: boolean }
   | { kind: 'shell'; id: string; command: string; output?: string; exitCode?: number | null; truncated?: boolean }
   | { kind: 'mcp'; id: string; servers?: McpServerView[]; loading: boolean; error?: string }
-  | { kind: 'turn'; modelUsage: Record<string, ModelUsage> }
+  | { kind: 'turn'; modelUsage: Record<string, ModelUsage>; skills: SkillUse[] }
   | { kind: 'error'; text: string };
+
+// a skill used in a turn: typed by the user as "/name" (a candidate: the view keeps only known non-builtin commands)
+// or invoked by Claude through the Skill tool
+export interface SkillUse { name: string; by: 'user' | 'claude'; args?: string; output?: string; isError?: boolean }
 
 export type TaskStatus = 'pending' | 'running' | 'completed' | 'failed' | 'killed' | 'paused';
 // log de um subagente (Task tool): items é só o que ele chamou de ferramenta, sem texto de raciocínio (ver spec)
@@ -54,6 +58,22 @@ function upsertTaskItem(tasks: TaskEntry[], taskId: string, item: Item): TaskEnt
   const next = tasks.slice();
   next[i] = { ...next[i], items: [...next[i].items, item] };
   return next;
+}
+
+// skills from the turn's user message up to now (subagent calls live in tasks, not here)
+function turnSkills(items: Item[]): SkillUse[] {
+  let i = items.length - 1;
+  while (i >= 0 && items[i].kind !== 'user') i--;
+  const out: SkillUse[] = [];
+  const u = items[i];
+  const m = u?.kind === 'user' ? /^\/(\S+)\s*([\s\S]*)$/.exec(u.text) : null;
+  if (m) out.push({ name: m[1], by: 'user', ...(m[2].trim() ? { args: m[2].trim() } : {}) });
+  for (const x of items.slice(i + 1)) {
+    if (x.kind !== 'tool' || x.name !== 'Skill') continue;
+    const inp = (x.input ?? {}) as { skill?: unknown; args?: unknown };
+    out.push({ name: String(inp.skill ?? '?'), by: 'claude', ...(typeof inp.args === 'string' && inp.args ? { args: inp.args } : {}), output: x.output, isError: x.isError });
+  }
+  return out;
 }
 
 // eventos antes do snapshot ou já vistos (seq <= lastSeq) são ignorados: dedupe na reconexão
@@ -139,7 +159,7 @@ export function applyEvent(c: Chat, ev: ClaudeEvent): Chat {
       next.totals = ev.totals;
       next.lastTokens = { input: ev.inputTokens, output: ev.outputTokens, cacheCreation: ev.cacheCreationTokens, cacheRead: ev.cacheReadTokens };
       // resumo só deste turno (com modelo usado); mostrado no terminal, não na conversa principal (ItemView ignora 'turn')
-      if (Object.keys(ev.modelUsage).length > 0) items.push({ kind: 'turn', modelUsage: ev.modelUsage });
+      if (Object.keys(ev.modelUsage).length > 0) items.push({ kind: 'turn', modelUsage: ev.modelUsage, skills: turnSkills(items) });
       break;
     case 'error':
       items.push({ kind: 'error', text: ev.message });

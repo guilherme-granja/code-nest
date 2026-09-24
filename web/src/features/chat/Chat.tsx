@@ -8,16 +8,17 @@ import { AttachMenu } from './AttachMenu';
 import { CommandsPanel } from './CommandsPanel';
 import { GitBar } from './GitBar';
 import { Markdown } from './Markdown';
-import type { Item } from './reduce';
+import type { Item, SkillUse } from './reduce';
 import { McpCard } from './McpCard';
 import { matchCommands, SlashMenu } from './SlashMenu';
 import { ShellCard } from './ShellCard';
+import { SkillsModal } from './SkillsModal';
 import { ToolCard } from './ToolCard';
 
 const STUCK_MS = 60_000;
 const json = (v: unknown) => JSON.stringify(v, null, 2)?.slice(0, 2000) ?? '';
 
-function ItemView({ it, busy, bypass }: { it: Item; busy: boolean; bypass: boolean }) {
+function ItemView({ it, busy, bypass, commands }: { it: Item; busy: boolean; bypass: boolean; commands?: SlashCommandInfo[] }) {
   // mensagens do modo shell/comandos vindas do terminal chegam como blocos de código: renderiza como markdown
   if (it.kind === 'user') {
     const bubble = it.text.includes('```')
@@ -38,7 +39,7 @@ function ItemView({ it, busy, bypass }: { it: Item; busy: boolean; bypass: boole
   if (it.kind === 'error') return <div className="whitespace-pre-wrap rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">{it.text}</div>;
   if (it.kind === 'shell') return <ShellCard it={it} busy={busy} />;
   if (it.kind === 'mcp') return <McpCard it={it} />;
-  if (it.kind === 'turn') return <TurnSummary modelUsage={it.modelUsage} bypass={bypass} />;
+  if (it.kind === 'turn') return <TurnSummary modelUsage={it.modelUsage} skills={it.skills} commands={commands} bypass={bypass} />;
   return <ToolCard it={it} />;
 }
 
@@ -53,13 +54,22 @@ function TurnLoading({ phase, tool, startedAt, now }: { phase: 'routing' | 'thin
   );
 }
 
-function TurnSummary({ modelUsage, bypass }: { modelUsage: Record<string, ModelUsage>; bypass: boolean }) {
+function TurnSummary({ modelUsage, skills, commands, bypass }: { modelUsage: Record<string, ModelUsage>; skills: SkillUse[]; commands?: SlashCommandInfo[]; bypass: boolean }) {
+  const [open, setOpen] = useState(false);
+  // a typed "/name" only counts when it is a known skill (builtins like /compact aren't skills)
+  const used = skills.filter((s) => s.by === 'claude' || commands?.some((c) => c.name === s.name && !c.builtin));
   const cost = Object.values(modelUsage).reduce((s, u) => s + u.costUsd, 0);
   const tok = Object.values(modelUsage).reduce((s, u) => s + u.input + u.output, 0);
   const models = Object.keys(modelUsage).map((id) => id.replace(/^claude-/, '').replace(/-\d{8}$/, '')).join(' + ');
   return (
     <div className="flex items-center justify-center gap-2 text-center font-mono text-[11px] text-zinc-600">
       turno concluído — ${cost.toFixed(4)} · {fmtTokens(tok)} tokens · {models}
+      {used.length > 0 && (
+        <button className="rounded-sm border border-violet-500/25 bg-violet-500/10 px-1.5 py-0.5 text-[10px] tracking-wider text-violet-300/90 hover:bg-violet-500/20" onClick={() => setOpen(true)}>
+          {used.length === 1 ? 'skill invocada' : `${used.length} skills invocadas`}
+        </button>
+      )}
+      {open && <SkillsModal skills={used} commands={commands} summary={`$${cost.toFixed(4)} · ${fmtTokens(tok)} tokens · ${models}`} onClose={() => setOpen(false)} />}
       {bypass && <span className="rounded-sm border border-rose-500/20 bg-rose-500/10 px-1.5 py-0.5 text-[10px] tracking-wider text-rose-400/80">bypass</span>}
     </div>
   );
@@ -190,7 +200,7 @@ export function Chat() {
       )}
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
-        {chat.items.map((it, i) => <ItemView key={i} it={it} busy={busy} bypass={!!project?.bypass} />)}
+        {chat.items.map((it, i) => <ItemView key={i} it={it} busy={busy} bypass={!!project?.bypass} commands={commands} />)}
         {chat.turnPhase !== 'idle' && chat.state !== 'awaiting_permission' && <TurnLoading phase={chat.turnPhase} tool={runningTool} startedAt={chat.turnPhaseAt} now={now} />}
         {chat.pending.filter((p) => !isAskUserQuestion(p)).map((p) => (
           <div key={p.reqId} className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/50 shadow-md">

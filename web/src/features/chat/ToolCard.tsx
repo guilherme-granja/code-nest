@@ -16,7 +16,7 @@ function Block({ text, tone = 'plain' }: { text: string; tone?: keyof typeof ton
 
 export const toolSummary = (t: Tool): string => {
   const i = (t.input ?? {}) as Record<string, unknown>;
-  return str(i.command ?? i.file_path ?? i.path ?? i.pattern ?? i.url ?? i.description).split('\n')[0].slice(0, 120);
+  return str(i.command ?? i.skill ?? i.file_path ?? i.path ?? i.pattern ?? i.url ?? i.description).split('\n')[0].slice(0, 120);
 };
 
 // Bash: comando + saída; Edit: diff antigo/novo; Write: conteúdo; demais: entrada em JSON
