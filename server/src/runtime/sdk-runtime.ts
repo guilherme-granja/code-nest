@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { createSdkMcpServer, query, tool, type CanUseTool, type PermissionResult, type Query, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
-import { EFFORTS, MODELS, type EventBody, type HistoryItem, type Model, type ModelUsage, type ShellResult, type SlashCommandInfo, type UsageTotals } from '@ccui/shared';
+import { createSdkMcpServer, query, tool, type CanUseTool, type McpServerStatus, type PermissionResult, type Query, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
+import { EFFORTS, MODELS, type EventBody, type HistoryItem, type McpAction, type McpServerView, type Model, type ModelUsage, type ShellResult, type SlashCommandInfo, type UsageTotals } from '@ccui/shared';
 import { z } from 'zod';
 import { visibleCommands } from '../commands';
 import { mapMessage } from './events';
@@ -54,6 +54,38 @@ function channel<T>() {
       }
     },
   };
+}
+
+const MCP_WAIT_MS = 20_000;
+
+function mcpView(s: McpServerStatus): McpServerView {
+  const c = s.config;
+  const target = !c ? undefined : 'command' in c ? [c.command, ...(c.args ?? [])].join(' ') : 'url' in c ? c.url : undefined;
+  return {
+    name: s.name, status: s.status,
+    // plugin servers report scope 'dynamic'; the terminal lists them under their own group
+    scope: s.source === 'plugin' || s.name.startsWith('plugin:') ? 'plugin' : s.scope ?? s.source, transport: c?.type ?? (c ? 'stdio' : undefined), target,
+    ...(s.error ? { error: s.error } : {}), ...(s.serverInfo ? { serverInfo: s.serverInfo } : {}),
+    tools: (s.tools ?? []).map((t) => ({ name: t.name, ...(t.description ? { description: t.description } : {}) })),
+  };
+}
+
+// same data the terminal's /mcp shows; waits for servers still connecting (like the terminal's spinner)
+async function mcpStatus(q: Query, action?: McpAction): Promise<{ servers: McpServerView[]; error?: string }> {
+  let error: string | undefined;
+  try {
+    if (action?.kind === 'reconnect') await q.reconnectMcpServer(action.server);
+    else if (action) await q.toggleMcpServer(action.server, action.kind === 'enable');
+  } catch (e) { error = (e as Error).message; }
+  const until = Date.now() + MCP_WAIT_MS;
+  let list = await q.mcpServerStatus();
+  while (list.some((s) => s.status === 'pending') && Date.now() < until) {
+    await new Promise((r) => setTimeout(r, 500));
+    list = await q.mcpServerStatus();
+  }
+  // hides the UI's own in-process server (Model Routing), which the terminal never shows
+  const servers = list.filter((s) => s.source !== 'sdk' && s.config?.type !== 'sdk').map(mcpView);
+  return error ? { servers, error } : { servers };
 }
 
 export const forbiddenModel = (m?: string) => !!m && /opus|fable/i.test(m);
@@ -170,6 +202,7 @@ class Live implements LiveSession {
     await this.q.interrupt();
   }
   async setModel(model: Model) { await this.q.setModel(model); }
+  mcp(action?: McpAction) { return mcpStatus(this.q, action); }
   answerPermission(reqId: string, allow: boolean, updatedInput?: Record<string, unknown>) { this.pending.get(reqId)?.(allow, undefined, updatedInput); }
 
   // fecha stdin (EOF) => o claude sai sozinho; se não sair em 2 s, encerra à força
@@ -239,6 +272,28 @@ export class SdkRuntime implements ClaudeRuntime {
     try {
       const timeout = new Promise<never>((_, rej) => { timer = setTimeout(() => rej(new Error('timeout ao listar comandos')), COMMANDS_TIMEOUT_MS); });
       return visibleCommands(await Promise.race([q.supportedCommands(), timeout]));
+    } finally {
+      clearTimeout(timer);
+      input.end();
+      q.close();
+    }
+  }
+
+  async mcp(cwd: string, lean: boolean, action?: McpAction): Promise<{ servers: McpServerView[]; error?: string }> {
+    const input = channel<SDKUserMessage>();
+    const q = query({
+      prompt: input,
+      options: {
+        cwd, model: 'haiku', persistSession: false,
+        systemPrompt: { type: 'preset', preset: 'claude_code' },
+        settingSources: lean ? [] : ['user', 'project', 'local'],
+        spawnClaudeCodeProcess: (so) => this.transport.spawn(so, () => {}),
+      },
+    });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const timeout = new Promise<never>((_, rej) => { timer = setTimeout(() => rej(new Error('timeout reading MCP status')), COMMANDS_TIMEOUT_MS + MCP_WAIT_MS); });
+      return await Promise.race([mcpStatus(q, action), timeout]);
     } finally {
       clearTimeout(timer);
       input.end();

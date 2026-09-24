@@ -1,5 +1,5 @@
 import type { SpawnedProcess, SpawnOptions } from '@anthropic-ai/claude-agent-sdk';
-import type { DirEntry, Effort, EventBody, HistoryItem, Model, ModelUsage, ShellResult, SlashCommandInfo, UsageTotals } from '@ccui/shared';
+import type { DirEntry, Effort, EventBody, HistoryItem, McpAction, McpServerView, Model, ModelUsage, ShellResult, SlashCommandInfo, UsageTotals } from '@ccui/shared';
 import type { CostCheckpoint } from './jsonl';
 
 export interface SessionInfo { sessionId: string; summary: string; customTitle?: string; firstPrompt?: string; lastModified: number }
@@ -34,6 +34,8 @@ export interface LiveSession {
   interrupt(): Promise<void>;
   answerPermission(reqId: string, allow: boolean, updatedInput?: Record<string, unknown>): void;
   setModel(model: Model): Promise<void>;
+  /** `/mcp`: applies the action (if any) and returns the servers' status */
+  mcp(action?: McpAction): Promise<{ servers: McpServerView[]; error?: string }>;
   close(): Promise<void>;
   events: AsyncIterable<EventBody>;
 }
@@ -45,6 +47,8 @@ export interface ClaudeRuntime {
   shell(cwd: string, command: string): Promise<ShellResult>;
   /** comandos `/` disponíveis para o projeto (skills, plugins e nativos permitidos); não envia nada ao modelo */
   commands(cwd: string, lean: boolean): Promise<SlashCommandInfo[]>;
+  /** `/mcp` without a live session: short-lived process, no message sent (no token cost) */
+  mcp(cwd: string, lean: boolean, action?: McpAction): Promise<{ servers: McpServerView[]; error?: string }>;
   /** decide Haiku ou Sonnet pra uma mensagem (heurística + fallback Haiku descartável) */
   classify(cwd: string, text: string): Promise<Model>;
   /** após uma queda: espera o claude da sessão terminar (não lança) */

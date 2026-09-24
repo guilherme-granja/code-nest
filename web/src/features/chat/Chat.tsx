@@ -9,6 +9,7 @@ import { CommandsPanel } from './CommandsPanel';
 import { GitBar } from './GitBar';
 import { Markdown } from './Markdown';
 import type { Item } from './reduce';
+import { McpCard } from './McpCard';
 import { matchCommands, SlashMenu } from './SlashMenu';
 import { ShellCard } from './ShellCard';
 import { ToolCard } from './ToolCard';
@@ -36,6 +37,7 @@ function ItemView({ it, busy, bypass }: { it: Item; busy: boolean; bypass: boole
   if (it.kind === 'assistant') return <Markdown text={it.text} />;
   if (it.kind === 'error') return <div className="whitespace-pre-wrap rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">{it.text}</div>;
   if (it.kind === 'shell') return <ShellCard it={it} busy={busy} />;
+  if (it.kind === 'mcp') return <McpCard it={it} />;
   if (it.kind === 'turn') return <TurnSummary modelUsage={it.modelUsage} bypass={bypass} />;
   return <ToolCard it={it} />;
 }
@@ -95,7 +97,7 @@ function AttachedFilesPill({ sessionId, connectionId }: { sessionId: string; con
 }
 
 export function Chat() {
-  const { active, chats, rows, projects, config, status, up, ui, send, shell, interrupt, answer, setUi, ensureCommands } = useApp();
+  const { active, chats, rows, projects, config, status, up, ui, send, shell, mcp, interrupt, answer, setUi, ensureCommands } = useApp();
   const chat = active ? chats[active.sessionId] : undefined;
   const project = projects.find((p) => p.id === active?.projectId);
   const commands = useApp((s) => (project ? s.commands[`${project.id}:${project.lean}`] : undefined));
@@ -145,6 +147,8 @@ export function Chat() {
     if (!t || !up) return;
     // modo shell: "!comando" roda direto no diretório do projeto (não vai ao modelo)
     if (t.startsWith('!')) { const cmd = t.slice(1).trim(); if (cmd) { shell(cmd); setText(''); } return; }
+    // /mcp: interactive panel like the terminal's, instead of the CLI's one-line text summary (not sent to the model)
+    if (t === '/mcp') { mcp(); setText(''); return; }
     if (!busy) { send(t); setText(''); }
   };
   const pick = (c: SlashCommandInfo) => { setText(`/${c.name} `); setSel(0); input.current?.focus(); };

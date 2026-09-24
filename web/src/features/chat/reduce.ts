@@ -1,10 +1,11 @@
-import { ZERO_TOTALS, type ClaudeEvent, type Model, type ModelUsage, type PendingPermission, type ServerMsg, type SessionState, type UsageTotals } from '@ccui/shared';
+import { ZERO_TOTALS, type ClaudeEvent, type McpServerView, type Model, type ModelUsage, type PendingPermission, type ServerMsg, type SessionState, type UsageTotals } from '@ccui/shared';
 
 export type Item =
   | { kind: 'user'; text: string; routedModel?: Model }
   | { kind: 'assistant'; text: string; streaming?: boolean }
   | { kind: 'tool'; toolUseId: string; name: string; input: unknown; output?: string; isError?: boolean }
   | { kind: 'shell'; id: string; command: string; output?: string; exitCode?: number | null; truncated?: boolean }
+  | { kind: 'mcp'; id: string; servers?: McpServerView[]; loading: boolean; error?: string }
   | { kind: 'turn'; modelUsage: Record<string, ModelUsage> }
   | { kind: 'error'; text: string };
 
@@ -114,6 +115,15 @@ export function applyEvent(c: Chat, ev: ClaudeEvent): Chat {
     case 'shell.result': {
       const i = items.findIndex((x) => x.kind === 'shell' && x.id === ev.id);
       if (i >= 0) items[i] = { ...(items[i] as Extract<Item, { kind: 'shell' }>), output: ev.output, exitCode: ev.exitCode, truncated: ev.truncated };
+      break;
+    }
+    case 'mcp.status': {
+      const i = items.findIndex((x) => x.kind === 'mcp' && x.id === ev.id);
+      const prev = i >= 0 ? (items[i] as Extract<Item, { kind: 'mcp' }>) : undefined;
+      const it: Item = ev.servers
+        ? { kind: 'mcp', id: ev.id, servers: ev.servers, loading: false, error: ev.error }
+        : { kind: 'mcp', id: ev.id, servers: prev?.servers, loading: true, error: undefined };
+      if (i >= 0) items[i] = it; else items.push(it);
       break;
     }
     case 'permission.requested':

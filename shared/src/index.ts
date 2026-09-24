@@ -67,6 +67,8 @@ export type EventBody =
   | { type: 'turn.completed'; totals: UsageTotals; inputTokens: number; outputTokens: number; cacheCreationTokens: number; cacheReadTokens: number; modelUsage: Record<string, ModelUsage> }
   | { type: 'shell.started'; id: string; command: string }
   | ({ type: 'shell.result'; id: string } & ShellResult)
+  // `/mcp` panel: servers absent = still loading (the client keeps the previous list while it refreshes)
+  | { type: 'mcp.status'; id: string; servers?: McpServerView[]; error?: string }
   | { type: 'error'; code: 'runtime' | 'exit'; message: string };
 export type ClaudeEvent = EventBody & { sessionId: string; seq: number; ts: number };
 export interface HistoryItem { role: 'user' | 'assistant'; text: string }
@@ -74,6 +76,14 @@ export interface HistoryItem { role: 'user' | 'assistant'; text: string }
 export interface UsageTotals { costUsd: number; input: number; output: number; cacheCreation: number; cacheRead: number }
 export interface ModelUsage { input: number; output: number; cacheCreation: number; cacheRead: number; costUsd: number }
 export interface ShellResult { output: string; exitCode: number | null; truncated: boolean }
+export type McpStatus = 'connected' | 'failed' | 'needs-auth' | 'pending' | 'disabled';
+// what the terminal's /mcp shows; never env/headers (may carry secrets)
+export interface McpServerView {
+  name: string; status: McpStatus; scope?: string; transport?: string; target?: string; error?: string;
+  serverInfo?: { name: string; version: string }; tools: Array<{ name: string; description?: string }>;
+}
+export const mcpActionSchema = z.object({ kind: z.enum(['reconnect', 'enable', 'disable']), server: z.string().min(1).max(200) });
+export type McpAction = z.infer<typeof mcpActionSchema>;
 export const ZERO_TOTALS: UsageTotals = { costUsd: 0, input: 0, output: 0, cacheCreation: 0, cacheRead: 0 };
 
 // ---- protocolo WebSocket ----
@@ -84,6 +94,8 @@ export const ClientMsg = z.discriminatedUnion('type', [
   z.object({ type: z.literal('send'), sessionId: uuidSchema, text: z.string().min(1).max(200_000), attachments: z.array(z.string()).max(10).optional() }),
   z.object({ type: z.literal('interrupt'), sessionId: uuidSchema }),
   z.object({ type: z.literal('shell'), sessionId: uuidSchema, command: z.string().trim().min(1).max(10_000) }),
+  // id = existing /mcp card to refresh in place; absent = new card
+  z.object({ type: z.literal('mcp'), sessionId: uuidSchema, id: z.string().uuid().optional(), action: mcpActionSchema.optional() }),
   z.object({ type: z.literal('permission'), sessionId: uuidSchema, reqId: z.string().min(1), allow: z.boolean(), updatedInput: z.record(z.string(), z.unknown()).optional() }),
 ]);
 export type ClientMsgT = z.infer<typeof ClientMsg>;

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Config, ConnStatus, Project, ServerMsg, SessionRow, SlashCommandInfo } from '@ccui/shared';
+import type { Config, ConnStatus, McpAction, Project, ServerMsg, SessionRow, SlashCommandInfo } from '@ccui/shared';
 import { api, initToken } from './api';
 import { addError, applyEvent, applySnapshot, emptyChat, type Chat } from './features/chat/reduce';
 import { disableNotify, enableNotify, notify, notifyEnabled } from './notify';
@@ -61,6 +61,7 @@ interface App {
   send(text: string): void;
   interrupt(): void;
   shell(command: string): void;
+  mcp(id?: string, action?: McpAction): void;
   answer(reqId: string, allow: boolean, updatedInput?: Record<string, unknown>): void;
   chooseConnection(connectionId: string): Promise<void>;
 }
@@ -236,6 +237,10 @@ export const useApp = create<App>((set, get) => {
     shell(command) {
       const a = get().active;
       if (a) sock?.send({ type: 'shell', sessionId: a.sessionId, command });
+    },
+    mcp(id, action) {
+      const a = get().active;
+      if (a) sock?.send({ type: 'mcp', sessionId: a.sessionId, id, action });
     },
     answer(reqId, allow, updatedInput) {
       const a = get().active;

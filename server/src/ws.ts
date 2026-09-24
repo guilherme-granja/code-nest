@@ -60,6 +60,9 @@ export function attachWs(server: Server, o: { port: number; token: string; hub: 
             touch(o.store, m.sessionId);
             if ((await o.hub.shell(m.sessionId, m.command)) === 'busy') client.send({ type: 'error', code: 'busy', message: 'já há um comando shell em execução nesta sessão' });
             break;
+          case 'mcp':
+            if ((await o.hub.mcp(m.sessionId, m.id, m.action)) === 'busy') client.send({ type: 'error', code: 'busy', message: 'an /mcp request is already running in this session' });
+            break;
           case 'permission': o.hub.answerPermission(m.sessionId, m.reqId, m.allow, m.updatedInput); break;
         }
       } catch (e) {

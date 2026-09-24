@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { ZERO_TOTALS, type ClaudeEvent, type EventBody, type ModelUsage, type PendingPermission, type ServerMsg, type SessionState, type UsageTotals } from '@ccui/shared';
+import { ZERO_TOTALS, type ClaudeEvent, type EventBody, type McpAction, type ModelUsage, type PendingPermission, type ServerMsg, type SessionState, type UsageTotals } from '@ccui/shared';
 import type { ClaudeRuntime, LiveSession, OpenOptions } from './runtime/types';
 
 const BUFFER = 2000;
@@ -16,6 +16,7 @@ interface Entry {
   clients: Set<Client>;
   pending: Map<string, PendingPermission>;
   shellRunning: boolean;
+  mcpRunning: boolean;
   totals: UsageTotals | null; // null até a 1ª leitura do jsonl ou o 1º turno desta execução
   // ponytail: snapshot cumulativo por-modelo só desta execução (não lido do jsonl); no 1º turno após reabrir a sessão
   // o delta calculado é o acumulado inteiro, não só o turno — aceitável, é só o resumo exibido no terminal
@@ -46,7 +47,7 @@ export class SessionHub {
   private entry(id: string): Entry {
     let e = this.entries.get(id);
     if (!e) {
-      e = { seq: 0, buffer: [], state: 'idle', live: null, clients: new Set(), pending: new Map(), shellRunning: false, totals: null, prevModelUsage: null };
+      e = { seq: 0, buffer: [], state: 'idle', live: null, clients: new Set(), pending: new Map(), shellRunning: false, mcpRunning: false, totals: null, prevModelUsage: null };
       this.entries.set(id, e);
     }
     return e;
@@ -122,6 +123,23 @@ export class SessionHub {
     } catch (err) {
       this.emit(id, e, { type: 'shell.result', id: sid, output: (err as Error).message, exitCode: null, truncated: false });
     } finally { e.shellRunning = false; }
+    return 'ok';
+  }
+
+  // `/mcp`: panel as an event (like shell); uses the live process when there is one, otherwise a short-lived one
+  async mcp(id: string, cardId?: string, action?: McpAction): Promise<'ok' | 'busy'> {
+    const spec = this.spec(id);
+    const e = this.entry(id);
+    if (e.mcpRunning) return 'busy';
+    e.mcpRunning = true;
+    const mid = cardId ?? randomUUID();
+    this.emit(id, e, { type: 'mcp.status', id: mid });
+    try {
+      const r = e.live ? await e.live.mcp(action) : await this.runtimeFor(id).mcp(spec.cwd, spec.lean, action);
+      this.emit(id, e, { type: 'mcp.status', id: mid, ...r });
+    } catch (err) {
+      this.emit(id, e, { type: 'mcp.status', id: mid, servers: [], error: (err as Error).message });
+    } finally { e.mcpRunning = false; }
     return 'ok';
   }
 
