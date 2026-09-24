@@ -143,6 +143,16 @@ export class SessionHub {
     return 'ok';
   }
 
+  // "Refresh": reloads skills/plugins into the open process; with none open the next message already starts fresh (null).
+  // Refused mid-turn so the tool list doesn't change under a running turn.
+  async reload(id: string): Promise<{ plugins: number; errors: number } | null | 'busy'> {
+    this.spec(id);
+    const e = this.entries.get(id);
+    if (!e?.live) return null;
+    if (e.state === 'running' || e.state === 'awaiting_permission') return 'busy';
+    return e.live.reload();
+  }
+
   private async pump(id: string, e: Entry, live: LiveSession) {
     let crashed = false;
     for await (const b of live.events) {

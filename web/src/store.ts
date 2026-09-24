@@ -55,6 +55,8 @@ interface App {
   setSidebarW(w: number): void;
   toggleCollapsed(key: string): void;
   ensureCommands(projectId: string): Promise<void>;
+  /** reloads skills/plugins into the active session and refetches the `/` list; resolves to a short status line */
+  refreshSession(): Promise<string>;
   addAttachment(sessionId: string, path: string): void;
   removeAttachment(sessionId: string, path: string): void;
   toggleNotify(): Promise<void>;
@@ -206,6 +208,20 @@ export const useApp = create<App>((set, get) => {
         const list = await api.commands(p.id);
         if (list.length) set((s) => ({ commands: { ...s.commands, [key]: list } }));
       } catch { /* tenta de novo na próxima abertura */ } finally { loadingCommands.delete(key); }
+    },
+
+    async refreshSession() {
+      const a = get().active;
+      const p = get().projects.find((x) => x.id === a?.projectId);
+      if (!a || !p) return '';
+      const r = await api.reload(p.id, a.sessionId);
+      const key = `${p.id}:${p.lean}`;
+      set((s) => { const { [key]: _, ...rest } = s.commands; return { commands: rest }; });
+      await get().ensureCommands(p.id);
+      const n = get().commands[key]?.length ?? 0;
+      return r.live
+        ? `${n} commands/skills · ${r.plugins} plugins${r.errors ? ` · ${r.errors} plugin errors` : ''}`
+        : `${n} commands/skills (session not running: the next message loads them fresh)`;
     },
 
     async toggleNotify() {

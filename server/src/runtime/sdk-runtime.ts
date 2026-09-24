@@ -203,6 +203,11 @@ class Live implements LiveSession {
   }
   async setModel(model: Model) { await this.q.setModel(model); }
   mcp(action?: McpAction) { return mcpStatus(this.q, action); }
+  async reload() {
+    await this.q.reloadSkills();
+    const r = await this.q.reloadPlugins(); // applied even when it invalidates the prompt cache: the user asked for it
+    return { plugins: r.plugins.length, errors: r.error_count };
+  }
   answerPermission(reqId: string, allow: boolean, updatedInput?: Record<string, unknown>) { this.pending.get(reqId)?.(allow, undefined, updatedInput); }
 
   // fecha stdin (EOF) => o claude sai sozinho; se não sair em 2 s, encerra à força

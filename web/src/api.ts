@@ -41,6 +41,7 @@ export const api = {
   newSession: (pid: string, b: { name: string; model?: Model; effort?: Effort; routing?: boolean }) => req<{ sessionId: string }>('POST', `/api/projects/${pid}/sessions`, b),
   patchSession: (sid: string, projectId: string, b: { name?: string; favorite?: boolean; archived?: boolean; tags?: string[] }) => req<void>('PATCH', `/api/sessions/${sid}`, { projectId, ...b }),
   commands: (pid: string) => req<SlashCommandInfo[]>('GET', `/api/projects/${pid}/commands`),
+  reload: (pid: string, sid: string) => req<{ live: boolean; plugins?: number; errors?: number }>('POST', `/api/projects/${pid}/sessions/${sid}/reload`),
   git: (pid: string) => req<GitInfo | null>('GET', `/api/projects/${pid}/git`),
   usageToday: () => req<TodayUsage>('GET', '/api/usage/today'),
   projectUsage: (id: string) => req<ProjectUsageView>('GET', `/api/projects/${id}/usage`),

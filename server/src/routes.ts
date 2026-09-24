@@ -209,6 +209,19 @@ export function buildApi({ store, hub, conns }: Deps) {
     } catch { return c.json([]); }
   });
 
+  // "Refresh" button: reloads skills/plugins into the live session and drops the cached `/` list so the next fetch sees them
+  api.post('/projects/:id/sessions/:sid/reload', async (c) => {
+    const p = project(c.req.param('id'));
+    const sid = uuidSchema.safeParse(c.req.param('sid'));
+    if (!p || !sid.success) return c.json({ error: 'projeto/sessão desconhecido' }, 404);
+    cmdCache.delete(`${p.id}:${p.lean}`);
+    try {
+      const r = await hub.reload(sid.data);
+      if (r === 'busy') return c.json({ error: 'wait for the current turn to finish' }, 409);
+      return c.json({ live: !!r, ...(r ?? {}) });
+    } catch (e) { return bad(c, (e as Error).message); }
+  });
+
   // branch/status do Git do projeto (null quando não é um repositório ou o servidor não responde)
   api.get('/projects/:id/git', async (c) => {
     const p = project(c.req.param('id'));
