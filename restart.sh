@@ -3,7 +3,9 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-LOCK="$HOME/.claude-code-ui/lock"
+# ~/.claude-code-ui = data dir from before the rename to Code Nest (moved to ~/.code-nest on the next start)
+LOCK="$HOME/.code-nest/lock"
+[ -f "$LOCK" ] || LOCK="$HOME/.claude-code-ui/lock"
 if [ -f "$LOCK" ]; then
   PID="$(cat "$LOCK")"
   if kill -0 "$PID" 2>/dev/null; then

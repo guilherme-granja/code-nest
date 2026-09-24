@@ -8,13 +8,25 @@ The terminal is great for coding, not so great for tracking several Claude Code 
 
 ## Features
 
-- **Chat with Claude** — streaming responses, rendered markdown (GFM + syntax highlight), cost/tokens per turn.
-- **Multiple sessions/tabs** — each session keeps running in the background even with the tab closed.
-- **Local and remote (SSH) projects** — opens `claude` sessions on a remote host as if it were local; survives SSH drops (the remote process finishes the turn on its own, and the UI reconnects and re-syncs history).
-- **Model Routing** — per message, decides between Haiku (fast/cheap) and Sonnet (more capable) via a text heuristic plus a disposable Haiku classifier fallback, with automatic mid-turn escalation when a task turns out more complex than expected. Opt-in per project — when off, it runs on the fixed configured model with zero overhead.
-- **Read-only terminal** — shows commands run (`!cmd`) and subagent logs (Task tool), but never accepts direct input: permission approval is never bypassed.
-- **Slash commands with autocomplete**, **search/tags/favorites/archiving** for sessions, **Git status bar**, **themes** (light/dark/system), **browser notifications**, **keyboard shortcuts**, and a **command palette** (`Ctrl/Cmd+K`).
-- **Permission bypass** per project, with explicit confirmation — for anyone who wants to run without manual approval in trusted environments.
+**Chat and sessions**
+- **Chat with Claude**: streaming responses, rendered markdown (GFM + syntax highlight), a turn indicator that shows which tool is running, and cost/tokens per turn.
+- **Multiple sessions/tabs**: each session keeps running in the background even with the tab closed.
+- **File attachments**: attach files from the project's machine (local or SSH); images (up to 5 MB) go to Claude as real images, other files as a path reference.
+- **Slash commands** with autocomplete. In the composer, a command is highlighted blue when it exists and red when it doesn't. Commands that would break the UI's rules (`/clear`, `/model`, `/fast`, `/effort`, `/config`…) are blocked, with an explanation.
+- **`/mcp` panel**: the same view as the terminal's `/mcp`. It shows servers grouped by scope with their status, details and tools, and has Reconnect/Enable/Disable buttons. claude.ai connectors that need sign-in link straight to claude.ai.
+- **Shell mode (`!cmd`)**: runs a command in the project directory without going through the model, with the `!` prefix highlighted in the composer. The output can be sent to Claude on demand.
+
+**Projects**
+- **Local and remote (SSH) projects**: opens `claude` sessions on a remote host as if it were local. It survives SSH drops: the remote process finishes the turn on its own, and the UI reconnects and re-syncs history.
+- **Folder browser**: pick the project directory by browsing the local or remote filesystem, instead of typing the path.
+- **Per-project settings**: Lean mode (skips user hooks/plugins/skills/MCP/CLAUDE.md, much cheaper session start), Model Routing, and permission bypass (with explicit confirmation).
+- **Model Routing**: per message, picks Haiku (fast/cheap) or Sonnet (more capable). It uses a text heuristic, with a throwaway Haiku classifier as a fallback, and can escalate to Sonnet mid-turn when a task turns out harder than expected. It is opt-in per project (or per session). When off, the fixed configured model runs with zero overhead.
+
+**Visibility and control**
+- **Spend dashboard**: today's spend, broken down by model and by project, with a per-project drill-down into recent sessions.
+- **Read-only terminal**: shows `!cmd` runs and subagent logs (Task tool). It never accepts direct input, so permission approval is never bypassed.
+- **Global settings**: default model/effort and remote (SSH) servers, editable at runtime.
+- **Search/tags/favorites/archiving** for sessions, a **Git status bar**, **themes** (light/dark/system), **browser notifications**, **keyboard shortcuts**, a resizable sidebar, and a **command palette** (`Ctrl/Cmd+K`).
 
 Only `haiku` and `sonnet` are used — Opus and Fable are blocked by design (cost), enforced on the backend on every model response, not just at initial config.
 
@@ -33,7 +45,7 @@ No state-machine framework, no ORM, no Controller/Service layers — each file h
 ## Structure
 
 ```
-web/     -> React SPA (chat, tabs, sidebar, read-only terminal, themes)
+web/     -> React SPA (chat, tabs, sidebar, settings, spend dashboard, read-only terminal)
 server/  -> Hono API + WebSocket + Agent SDK runtime (local and SSH)
 shared/  -> types and WebSocket event protocol used by both sides
 docs/    -> architecture/frontend/backend/testing documentation
@@ -59,7 +71,15 @@ npm run build         # builds the frontend into web/dist
 npm run start         # runs the backend, serving the static frontend
 ```
 
-The backend automatically opens the browser at `http://127.0.0.1:4317/#token=...` — the token is generated per run and it only listens on loopback.
+The backend automatically opens the browser at `http://127.0.0.1:4317/#token=...`. The token is generated on every run, and the backend only listens on loopback.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `CCUI_PORT` | `4317` | HTTP/WebSocket port |
+| `CCUI_DATA_DIR` | `~/.code-nest` | where config, projects and session metadata live |
+| `CCUI_NO_OPEN` | unset | `1` = don't open the browser on start |
+
+> Upgrading from a version named "Claude Code UI": on the first start, `~/.claude-code-ui` is moved to `~/.code-nest` automatically (only when `CCUI_DATA_DIR` isn't set).
 
 To restart the app in production after changing code:
 
@@ -81,8 +101,15 @@ No automated test suite by project choice (see [`docs/testing.md`](docs/testing.
 - Backend only listens on `127.0.0.1`/`localhost` (rejects any other host).
 - Per-run auth token, required on every WebSocket/API connection.
 - Permission bypass is explicit opt-in per project, never default.
+- `/mcp` never sends server env vars or headers to the browser (they may carry credentials).
 - Model allowlist (`haiku`/`sonnet`) is checked both when opening a session and on every SDK response — defense in depth against a runtime model switch.
 
 ## Status
 
-Phases 1 (local), 2 (SSH), 3 (markdown/tabs/search/theme/git/shortcuts), and 5 (subagent terminal) are implemented with typecheck passing. Design/decision history for each feature lives in `docs/superpowers/{specs,plans}/`.
+| Version | Highlights |
+|---|---|
+| v1.0.0 | Local and SSH projects, chat/tabs/search/themes/git/shortcuts, Model Routing, subagent terminal |
+| v1.1.0 | "Precision dark" visual redesign (sidebar, tabs, chat, cards, terminal, composer) |
+| v1.2.0 | Renamed to Code Nest, global/per-project settings, folder browser, file attachments, spend dashboard, composer polish (slash/`!` highlighting, resizable box, running-tool indicator), per-session spend limit removed, `/mcp` panel |
+
+The design and decision history for each feature is in `docs/superpowers/{specs,plans}/`.

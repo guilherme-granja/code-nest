@@ -42,7 +42,7 @@ Web app to run Claude Code sessions in the browser instead of the terminal: chat
 - `npm run typecheck` — runs `tsc -p shared && tsc -p server && tsc -p web`
 - `npm run build` — builds the frontend (`web`)
 - `npm run dev:server` / `npm run dev:web` — local dev
-- `./restart.sh` — kills the old backend via the lock PID (`~/.claude-code-ui/lock`), builds, and starts it again
+- `./restart.sh` — kills the old backend via the lock PID (`~/.code-nest/lock`), builds, and starts it again
 - There is no lint or automated test script in `package.json` — don't invent `npm test`/`npm run lint`.
 
 ## Context Efficiency

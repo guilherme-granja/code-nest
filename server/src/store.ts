@@ -1,9 +1,13 @@
-import { promises as fs, unlinkSync } from 'node:fs';
+import { existsSync, promises as fs, renameSync, unlinkSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { LOCAL, type Config, type Project, type SessionMeta } from '@ccui/shared';
 
-export const DATA_DIR = process.env.CCUI_DATA_DIR ?? path.join(homedir(), '.claude-code-ui');
+export const DATA_DIR = process.env.CCUI_DATA_DIR ?? path.join(homedir(), '.code-nest');
+// the project used to be called "Claude Code UI": carry its data dir over once. A backend still running from the old
+// dir keeps its lock inside the moved folder, so acquireLock() still refuses to start a second one.
+const LEGACY_DATA_DIR = path.join(homedir(), '.claude-code-ui');
+if (!process.env.CCUI_DATA_DIR && !existsSync(DATA_DIR) && existsSync(LEGACY_DATA_DIR)) renameSync(LEGACY_DATA_DIR, DATA_DIR);
 
 export class JsonFile<T> {
   private queue: Promise<void> = Promise.resolve();

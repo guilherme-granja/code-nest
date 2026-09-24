@@ -6,6 +6,7 @@ React + Vite + Tailwind, strict TypeScript. No SPA router — a single layout (S
 
 ```
 app/App.tsx          visual entry point, global keybindings
+app/AppSettingsModal.tsx  global settings (default model/effort, remote SSH servers)
 main.tsx              React boot
 store.ts              global state (Zustand) + WebSocket lifecycle
 ws.ts                 WS client (auto-reconnect)
@@ -13,9 +14,11 @@ api.ts                HTTP client + token
 notify.ts             Notification API (opt-in, never shows message content)
 theme.ts              light/dark/system theme (outside React, localStorage)
 features/chat/        Chat, reduce.ts (event reducer), Markdown, GitBar, CommandsPanel,
-                       ShellCard, SlashMenu, ToolCard, AskUserQuestionModal
+                       ShellCard, McpCard, SlashMenu, ToolCard, AttachMenu, AskUserQuestionModal
 features/sessions/    Tabs, Palette (Ctrl+K), Shortcuts (? modal), NewSessionModal
-features/projects/    Sidebar (projects, routing/bypass toggles)
+features/projects/    Sidebar, ProjectSettingsModal (lean/routing/bypass),
+                       FolderBrowserModal (pick a folder, or files to attach)
+features/spend/       SpendDashboard (today by model/project), ProjectSpendView (drill-down)
 features/connect/     ConnectScreen, ServerForm (initial connection setup)
 lib/                  commands.ts (slash-command search), format.ts (fmtTokens etc.),
                        search.ts (normalization/matchRow)
@@ -25,7 +28,7 @@ lib/                  commands.ts (slash-command search), format.ts (fmtTokens e
 
 Zustand, a single global store (`useApp`, the only hook — no per-feature local hooks). Holds: config, projects, `tabs`, `chats` (per `sessionId`), UI state (palette/help/newSession/terminal). The WebSocket is created inside `start()` and reattached on reconnect. Layout preferences (sidebar visibility, collapsed groups) persist in `localStorage` under the `ccui-` prefix.
 
-Main actions: `open()`, `closeTab()`, `send()`, `interrupt()`, `answer()`, `shell()`.
+Main actions: `open()`, `closeTab()`, `send()` (includes the session's staged attachments), `interrupt()`, `answer()`, `shell()`, `mcp(id?, action?)`, `addAttachment()`/`removeAttachment()`.
 
 ## WebSocket
 
@@ -56,7 +59,11 @@ Main actions: `open()`, `closeTab()`, `send()`, `interrupt()`, `answer()`, `shel
 | Git bar | `features/chat/GitBar.tsx` | fetches `/api/projects/{id}/git`, refreshes at the end of each turn |
 | Read-only terminal | `features/chat/CommandsPanel.tsx` | shows `!` commands and per-Task (subagent) tabs; doesn't accept input — a deliberate decision, see `docs/architecture.md` |
 | Slash autocomplete | `features/chat/SlashMenu.tsx` | ranking: prefix > alias > name contains > description contains, max 40 items |
-| Bypass permissions | `features/projects/Sidebar.tsx` | per-project toggle with confirmation, red badge when active |
+| Composer | `features/chat/Chat.tsx` | height-resizable box with attach button and staged-files bar; a mirror div behind a transparent-text textarea colors the `/command` (blue = exists, red = unknown) and the `!` prefix; `/mcp` and `!cmd` are intercepted in `submit()` and never reach the model |
+| `/mcp` panel | `features/chat/McpCard.tsx` | servers grouped by scope, status icons like the terminal; click for details, tools, Reconnect/Enable/Disable; needs-auth claude.ai connectors link to claude.ai settings |
+| Project settings | `features/projects/ProjectSettingsModal.tsx` | Lean, Model Routing, permission bypass (confirmation required, red badge when active) |
+| Folder browser | `features/projects/FolderBrowserModal.tsx` | `GET /api/connections/:id/browse`; folder mode for new projects, file mode for attachments |
+| Spend dashboard | `features/spend/SpendDashboard.tsx` | today's total/by model/by project; drill-down lists recent sessions and can open a Haiku+routing "validate spend" session |
 | AskUserQuestion modal | `features/chat/AskUserQuestionModal.tsx` | single/multi-select + free text, answer sent via `updatedInput` |
 | Command palette | `features/sessions/Palette.tsx` | Ctrl/Cmd+K, searches sessions + global actions (new session, theme, sidebar, terminal) |
 

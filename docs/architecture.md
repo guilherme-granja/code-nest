@@ -15,10 +15,10 @@ Code Nest is a web app (browser) that opens and talks to Claude Code sessions, l
 
 Abstraction in `server/src/runtime/types.ts`:
 
-- `Transport` — everything that differs between local and remote execution: `spawn`, `listSessions`, `history`, `usage`, `shell`, `git`, `waitSessionIdle`. Implementations: `local-transport.ts` and `ssh-transport.ts`.
+- `Transport` — everything that differs between local and remote execution: `spawn`, `isDirectory`, `listDir` (folder browser), `readFile` (attachments), `listSessions`, `history`, `sessionExists`, `usage`, `costCheckpoints` (spend dashboard), `shell`, `git`, `waitSessionIdle`. Implementations: `local-transport.ts` and `ssh-transport.ts`.
 - `OpenOptions` — `cwd, sessionId, model, effort, lean, routing, permissionMode`.
-- `LiveSession` — an open session: `send`, `interrupt`, `answerPermission`, `setModel`, `close`, `events` (AsyncIterable of `EventBody`).
-- `ClaudeRuntime` — the facade used by `SessionHub`: `open`, `listSessions`, `history`, `usage`, `shell`, `commands`, `classify`, `settle`. Single implementation `SdkRuntime` (`sdk-runtime.ts`), parameterized by `Transport` — local and SSH use the same `SdkRuntime` class, only the `Transport` changes.
+- `LiveSession` — an open session: `send` (text + attachment paths), `interrupt`, `answerPermission`, `setModel`, `mcp`, `close`, `events` (AsyncIterable of `EventBody`).
+- `ClaudeRuntime` — the facade used by `SessionHub`: `open`, `listSessions`, `history`, `usage`, `shell`, `commands`, `mcp`, `classify`, `settle`. Single implementation `SdkRuntime` (`sdk-runtime.ts`), parameterized by `Transport` — local and SSH use the same `SdkRuntime` class, only the `Transport` changes.
 
 High-level flow for a message:
 
@@ -46,7 +46,7 @@ Decisions confirmed in code (`server/src/runtime/ssh-transport.ts`, `server/src/
 - **Careful `pgrep -f`**: the pattern used in `waitSessionIdle` (`ssh-transport.ts:86`) is `[${id[0]}]${id.slice(1)}` — the bracket keeps `pgrep`/the shell itself from matching its own grep.
 - **Two writers on the same jsonl**: when reopening a session that already exists (`SdkRuntime.open`, `sdk-runtime.ts:224-226`), it waits on `waitSessionIdle` before opening a new process, so it doesn't corrupt history with two `claude` processes writing at once.
 
-This is different from the **local backend lock** (`~/.claude-code-ui/lock`, single PID, one backend per `DATA_DIR`, used by `restart.sh`) and from **`run.json`** (`server/src/runtime/child.ts`), which only tracks PIDs of child `claude`/`ssh` processes to warn about (not kill) orphans on the next start — neither one uses `pkill -f`.
+This is different from the **local backend lock** (`~/.code-nest/lock`, single PID, one backend per `DATA_DIR`, used by `restart.sh`) and from **`run.json`** (`server/src/runtime/child.ts`), which only tracks PIDs of child `claude`/`ssh` processes to warn about (not kill) orphans on the next start — neither one uses `pkill -f`.
 
 ## WebSocket protocol
 
@@ -56,11 +56,12 @@ Architecturally relevant events/concepts (full protocol in `shared/src/index.ts`
 - `permission.requested { reqId, toolName, input }` / client-to-server message `{ type:'permission', sessionId, reqId, allow, updatedInput? }` — a single mechanism used both for normal tool approval and for the `AskUserQuestion` modal's answers (`updatedInput` carries the user's answers, resolved inside the SDK's `canUseTool`).
 - `turn.completed { totals, modelUsage, ... }` — closes the turn; `SessionHub` computes the per-model delta for this run (`diffModelUsage`, `hub.ts:26`) because the jsonl stores cumulative totals, not per-turn.
 - `session.state` — `idle | running | awaiting_permission | exited`.
+- `mcp.status { id, servers?, error? }` / client message `{ type:'mcp', sessionId, id?, action? }` — the `/mcp` panel (see below).
 
 ## Model Routing
 
 - **Goal**: per message, decide Haiku (cheap) vs Sonnet (capable), saving tokens without losing quality on complex tasks.
-- **When it runs**: only if `project.routing === true` (opt-in, default `false`). When off, `SessionHub.send` skips the whole block (`hub.ts:101`) — zero overhead, the fixed model comes from the hierarchy `session.model ?? project.model ?? config.defaults.model` (`domain.ts:13`).
+- **When it runs**: only if routing is on for the session (`session.routing ?? project.routing`, opt-in, default `false`). When off, `SessionHub.send` skips the whole block (`hub.ts:101`) — zero overhead, the fixed model comes from the hierarchy `session.model ?? project.model ?? config.defaults.model` (`domain.ts:13`).
 - **Heuristic** (`server/src/runtime/routing.ts`): empty text -> `haiku`; > 400 chars -> `sonnet`; matches `SONNET_HINTS` (implement/refactor/create/architect/fix bug/migrate/integrate/write code...) -> `sonnet`; matches `HAIKU_HINTS` (what is/explain/list/show/confirm/which...) and < 200 chars -> `haiku`; nothing matches -> **gray zone**, `null`.
 - **Gray zone**: `SdkRuntime.classifyViaHaiku` (`sdk-runtime.ts:168`) opens a disposable Haiku session (`persistSession:false, maxTurns:1`, `CLASSIFY_SYSTEM_PROMPT` system prompt), asks for 1 word (`haiku`/`sonnet`), 15s timeout. Error/timeout/ambiguous -> `sonnet` (never falls back to the cheap model on failure).
 - **Escalation**: with routing on, the SDK gets an internal MCP tool `request_model_upgrade(reason)` (`sdk-runtime.ts:74-84`) — the model itself (running on Haiku) can ask for an upgrade to Sonnet mid-turn; it goes through the normal permission flow (`canUseTool`) before `q.setModel('sonnet')` runs.
@@ -71,4 +72,7 @@ Architecturally relevant events/concepts (full protocol in `shared/src/index.ts`
 
 - **Model allowlist**: `forbiddenModel = /opus|fable/i` (`sdk-runtime.ts:43`), checked in `SdkRuntime.open` (`MODELS`/`EFFORTS` allowlist) and on every SDK message (`run()`, defense in depth against a runtime model switch via command/config/env). Never remove this redundant check.
 - **`bypass` (bypass permissions)**: a per-project flag (`project.bypass`) becomes `permissionMode: 'bypassPermissions'` + `allowDangerouslySkipPermissions: true` in the SDK (`domain.ts:18`, `sdk-runtime.ts:95`). A real feature, not a vulnerability — the user explicitly opted in per project.
+- **`/mcp` panel**: the client intercepts `/mcp` (it never reaches the model) and sends `{ type:'mcp' }`. `SessionHub.mcp()` reads `Query.mcpServerStatus()` from the live session, or from a short-lived process when none is open (`SdkRuntime.mcp`, same pattern as `commands()`, no token cost). It then emits `mcp.status`: first without `servers` (loading), then with the list. Actions (`reconnect`/`enable`/`disable`) go through `reconnectMcpServer`/`toggleMcpServer` and refresh the same card by `id`. The UI's own Model Routing server (`source: 'sdk'`) is hidden, and env/headers are never sent to the browser. MCP OAuth sign-in isn't possible from here: the SDK exposes no auth request, so it's done once in the terminal and the stored token is reused.
+- **Attachments**: `send` carries file paths; `Live.send` reads each via `Transport.readFile` (so SSH works too). Images up to 5 MB become image content blocks, everything else a `[Arquivo anexado: path]` text reference. `interrupt()` cancels a send whose attachments are still being read.
+- **Spend dashboard**: `/api/usage/today` and `/api/projects/:id/usage` aggregate the `cost-state` checkpoints from each session's jsonl (`Transport.costCheckpoints` + `jsonl.ts`); "today" = the latest cumulative value minus the last checkpoint before local midnight. Cost is an API-price estimate.
 - **Terminal (`!cmd`)**: shell mode is deliberately synchronous and PTY-less — it runs the typed command through `Transport.shell()` (local or via SSH) and publishes `shell.started`/`shell.result` as normal session events (included in replay). It's not an interactive terminal on purpose — an SDK exec of a command would bypass permission approval.

@@ -7,31 +7,33 @@ Node.js + Hono + WebSocket. No Controller/Service/Repository — modules are fil
 - `index.ts` — entry point: `openStore()`, `Connections`, `SessionHub`, Hono app (`/api` + static files from `web/dist`), `attachWs`, graceful shutdown on SIGINT/SIGTERM.
 - `hub.ts` — `SessionHub`: coordinates per-session state, event buffer for replay, WebSocket<->runtime bridge. See `docs/architecture.md` for the full flow.
 - `domain.ts` — `openSpecFor()` builds the `OpenSpec` (session->project->config hierarchy), `ensureMeta`, `touch`, `listProjectSessions`, `connectionIdFor`.
-- `store.ts` — `JsonFile<T>` (atomic read/write with `.bak`), `openStore()` loads `config.json`/`projects.json`/`sessions.json`, `acquireLock()` — one backend per `DATA_DIR` via `~/.claude-code-ui/lock` (PID).
+- `store.ts` — `JsonFile<T>` (atomic read/write with `.bak`), `openStore()` loads `config.json`/`projects.json`/`sessions.json`, `acquireLock()` — one backend per `DATA_DIR` via `~/.code-nest/lock` (PID).
 - `connections.ts` — `Connections`: active runtimes (local + configured SSH connections), periodically monitors SSH status.
-- `ws.ts` — `attachWs`: token-based auth handshake, dispatches client messages (`send`, `permission`, `shell`, `interrupt`, `attach`).
-- `routes.ts` — REST API (`/api/projects`, `/api/sessions`, etc.).
+- `ws.ts` — `attachWs`: token-based auth handshake, dispatches client messages (`attach`, `detach`, `send`, `interrupt`, `shell`, `mcp`, `permission`); `send` is rejected with an explanation when `blockedSlash()` matches.
+- `routes.ts` — REST API: `/api/state`, `/api/config`, `/api/connections` (+ `/test`, `/:id/browse` folder browser), `/api/projects` (+ `/:id/sessions`, `/:id/commands`, `/:id/git`, `/:id/usage`), `/api/sessions/:id`, `/api/usage/today`.
 - `security.ts` — `guard` (token/host check), `makeToken`.
 - `ssh-util.ts` — SSH helpers: `claudeExpr`, `encodeCwd`, `explainSshError`, `runSsh`, `shq` (shell-quote), `sshArgv`, `SESSION_ID_RE`.
-- `commands.ts` — `visibleCommands` (filters SDK slash-commands down to what the UI allows, e.g. blocks `/model` in headless mode).
+- `commands.ts` — `blockedSlash` (rejects `/clear`, `/model`, `/fast`, `/advisor`, `/effort`, `/config` with a reason) and `visibleCommands` (drops blocked and terminal-only commands from the autocomplete list).
 - `git.ts` — parses `git status --porcelain=v2 --branch` into `GitInfo`.
 
 ### `runtime/`
 
 - `types.ts` — the `Transport`, `OpenOptions`, `LiveSession`, `ClaudeRuntime` interfaces (see `docs/architecture.md`).
-- `sdk-runtime.ts` — `SdkRuntime` (the single `ClaudeRuntime` implementation) + the internal `Live` class (`LiveSession`). Uses `@anthropic-ai/claude-agent-sdk`: `query()`, `tool()`, `createSdkMcpServer()`, `canUseTool`. Contains `forbiddenModel`, the classifier (`classify`/`classifyViaHaiku`), and the routing escalation MCP server.
+- `sdk-runtime.ts` — `SdkRuntime` (the single `ClaudeRuntime` implementation) + the internal `Live` class (`LiveSession`). Uses `@anthropic-ai/claude-agent-sdk`: `query()`, `tool()`, `createSdkMcpServer()`, `canUseTool`. Contains `forbiddenModel`, the classifier (`classify`/`classifyViaHaiku`), the routing escalation MCP server, attachment reading (`attachmentBlocks`), and the `/mcp` status/actions (`mcpStatus`, used by both `Live.mcp` and the short-lived `SdkRuntime.mcp`).
 - `local-transport.ts` — the local `Transport` (spawns `claude` directly), `reportOrphans()`.
 - `ssh-transport.ts` — the SSH `Transport` (`sshTransport(conn)`), see decisions in `docs/architecture.md` §Remote/SSH.
 - `child.ts` — `spawnManaged` (detached process, own process group, cascading kill), `run.json` (PID registry for orphan warnings, not a lock).
 - `events.ts` — `mapMessage()`: translates SDK messages into the protocol's `EventBody`.
 - `routing.ts` — `classifyHeuristic`, `CLASSIFY_SYSTEM_PROMPT` (see Model Routing in `docs/architecture.md`).
-- `jsonl.ts` — parses the Claude Code jsonl: `parseHistory`, `firstPrompt`, `lastCostState`.
+- `jsonl.ts` — parses the Claude Code jsonl: `parseHistory`, `firstPrompt`, `lastCostState`, `costCheckpoints` (spend dashboard).
 
 ## SessionHub
 
 `send(id, text)` (`hub.ts:86`): reserves the `running` state before the `await` of opening the session (avoids a duplicate process); if `spec.routing`, emits `routing.started` -> `runtime.classify()` -> `live.setModel()` -> emits `model.routed`; always emits `user.message` and calls `live.send(text)`.
 
 `answerPermission(id, reqId, allow, updatedInput?)` — forwards to `live.answerPermission`, the same channel used both for normal tool approval and for `AskUserQuestion` answers.
+
+`shell(id, command)` / `mcp(id, cardId?, action?)` — side channels that don't go to the model: each publishes its result as normal session events (`shell.*`, `mcp.status`, included in replay), with one run at a time per session (`shellRunning`/`mcpRunning`).
 
 `recover(id, e)` (`hub.ts:141`) — called when the process dies (`error/exit`); waits on `runtime.settle()` (which uses `waitSessionIdle`) and resends the snapshot to every connected client.
 
@@ -45,8 +47,8 @@ Split between `routing.ts` (heuristic + classification prompt) and `sdk-runtime.
 
 ## Configuration
 
-- Store lives at `~/.claude-code-ui/{config,projects,sessions}.json` (or `CCUI_DATA_DIR`), atomic writes with `.bak` backup (`store.ts:26`).
-- Config hierarchy: `SessionMeta.model/effort` (per session) -> `Project.model/effort/routing/bypass/lean` (per project) -> `Config.defaults` (global, `model:'sonnet', effort:'medium'`).
+- Store lives at `~/.code-nest/{config,projects,sessions}.json` (or `CCUI_DATA_DIR`), atomic writes with `.bak` backup. A pre-rename `~/.claude-code-ui` is moved there once on start (`store.ts`).
+- Config hierarchy: `SessionMeta.model/effort/routing` (per session) -> `Project.model/effort/routing/bypass/lean` (per project) -> `Config.defaults` (global, `model:'sonnet', effort:'medium'`).
 - `permissionMode`: `default | plan | bypassPermissions`, derived from `project.bypass` in `domain.ts:18`.
 
 ## Error handling

@@ -31,6 +31,11 @@ When changing anything in `web/src/features/*` or the event protocol (`shared/sr
 - The `AskUserQuestion` modal sends the right answer via `updatedInput`.
 - The routing/bypass toggle in the Sidebar reflects in the actual behavior of the next message.
 - The read-only terminal (`CommandsPanel`) shows `!cmd` and Task tabs without accepting input.
+- Attachments: images arrive as images, other files as a path reference, local and SSH; interrupting while an attachment is still being read doesn't send it.
+- Folder browser: navigating/selecting works on local and SSH connections, in both folder and file mode.
+- Spend dashboard: today's totals match the turn summaries; the drill-down lists the right sessions.
+- `/mcp`: the list matches the terminal's `/mcp` (with and without an open session); Reconnect/Enable/Disable refresh the same card; Lean projects show no user MCPs.
+- Composer: `/command` coloring (blue/red), `!` highlight, resize, and blocked commands (`/clear`, `/model`…) show the explanation instead of being sent.
 
 ## Current limitation
 
