@@ -14,6 +14,8 @@ The terminal is great for coding, not so great for tracking several Claude Code 
 - **File attachments**: attach files from the project's machine (local or SSH); images (up to 5 MB) go to Claude as real images, other files as a path reference.
 - **Slash commands** with autocomplete. In the composer, a command is highlighted blue when it exists and red when it doesn't. Commands that would break the UI's rules (`/clear`, `/model`, `/fast`, `/effort`, `/config`…) are blocked, with an explanation.
 - **`/mcp` panel**: the same view as the terminal's `/mcp`. It shows servers grouped by scope with their status, details and tools, and has Reconnect/Enable/Disable buttons. claude.ai connectors that need sign-in link straight to claude.ai.
+- **Skills per turn**: when a skill runs in a turn (typed by you as `/skill`, or invoked by Claude), the turn summary gets a "skill invocada" badge. It opens a modal showing who invoked each skill, what it does, its arguments and its result.
+- **Refresh**: reloads skills and plugins from disk into the open session (for example, after creating a skill or installing a plugin) and refreshes the `/` command list, without restarting the session.
 - **Shell mode (`!cmd`)**: runs a command in the project directory without going through the model, with the `!` prefix highlighted in the composer. The output can be sent to Claude on demand.
 
 **Projects**
@@ -111,5 +113,6 @@ No automated test suite by project choice (see [`docs/testing.md`](docs/testing.
 | v1.0.0 | Local and SSH projects, chat/tabs/search/themes/git/shortcuts, Model Routing, subagent terminal |
 | v1.1.0 | "Precision dark" visual redesign (sidebar, tabs, chat, cards, terminal, composer) |
 | v1.2.0 | Renamed to Code Nest, global/per-project settings, folder browser, file attachments, spend dashboard, composer polish (slash/`!` highlighting, resizable box, running-tool indicator), per-session spend limit removed, `/mcp` panel |
+| v1.3.0 | Skills-invoked badge and modal on the turn summary, Refresh button (reload skills/plugins into the session), Code Nest data dir (`~/.code-nest`) with automatic migration, updated docs |
 
 The design and decision history for each feature is in `docs/superpowers/{specs,plans}/`.
