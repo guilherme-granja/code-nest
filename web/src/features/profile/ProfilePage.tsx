@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ProfileView } from '@ccui/shared';
 import { api } from '../../api';
+import { UsageModal } from './UsageModal';
 
 const field = 'rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-xs text-zinc-200 outline-none focus:border-zinc-700';
 const btn = 'rounded-md border border-zinc-800 px-2.5 py-1 text-xs text-zinc-300 transition-colors hover:bg-zinc-800 disabled:opacity-40';
@@ -35,6 +36,7 @@ function Fields({ title, data }: { title: string; data: Record<string, unknown> 
 function ProfileCard({ p, reload, setErr }: { p: ProfileView; reload: () => Promise<void>; setErr: (e: string) => void }) {
   const [code, setCode] = useState('');
   const [open, setOpen] = useState(p.active);
+  const [usage, setUsage] = useState(false);
   const loggedIn = p.status?.loggedIn === true;
   const run = async (f: () => Promise<void>) => { try { await f(); setErr(''); } catch (e) { setErr((e as Error).message); } await reload(); };
 
@@ -46,6 +48,7 @@ function ProfileCard({ p, reload, setErr }: { p: ProfileView; reload: () => Prom
         <span className={`text-xs ${loggedIn ? 'text-zinc-400' : 'text-amber-400'}`}>{loggedIn ? String(p.status?.email ?? '') : 'sem login'}</span>
         <div className="ml-auto flex gap-1.5">
           {!p.active && <button className={btn} disabled={!loggedIn} onClick={() => void run(() => api.profileAction(p.id, 'activate'))}>Usar</button>}
+          {loggedIn && <button className={btn} onClick={() => setUsage(true)}>Uso</button>}
           <button className={btn} onClick={() => void run(() => api.profileAction(p.id, 'login'))}>{loggedIn ? 'Reautenticar' : 'Login'}</button>
           {loggedIn && (
             <button className={btn} onClick={() => {
@@ -78,6 +81,7 @@ function ProfileCard({ p, reload, setErr }: { p: ProfileView; reload: () => Prom
           <Fields title="Credenciais" data={p.credentials} />
         </>
       )}
+      {usage && <UsageModal profile={p} onClose={() => setUsage(false)} />}
     </div>
   );
 }

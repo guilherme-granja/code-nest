@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import type { ProfileView } from '@ccui/shared';
+import { planUsage } from './runtime/sdk-runtime';
 import { DATA_DIR, type Store } from './store';
 
 // Claude accounts for local sessions. Each extra profile is its own CLAUDE_CONFIG_DIR holding only its login
@@ -75,6 +76,7 @@ async function authStatus(id: string) {
 }
 
 export const logout = (id: string) => cli(id, ['auth', 'logout']);
+export const usageFor = (id: string) => planUsage(envFor(id));
 
 // login runs the CLI's own OAuth flow: it opens the browser and waits for the localhost callback; the URL is also
 // surfaced to the UI, and `sendCode` covers the paste-the-code fallback when the callback can't reach this machine

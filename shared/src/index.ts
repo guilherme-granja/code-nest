@@ -47,7 +47,32 @@ export const createConnectionBody = z.object({ target: z.string().min(1).max(255
 export const patchProjectBody = z.object({ name: name(80).optional(), lean: z.boolean().optional(), routing: z.boolean().optional(), bypass: z.boolean().optional(), model: modelSchema.optional(), effort: effortSchema.optional() });
 export const patchConfigBody = z.object({ model: modelSchema.optional(), effort: effortSchema.optional() })
   .refine((b) => b.model !== undefined || b.effort !== undefined, { message: 'nada para alterar' });
-export const createProfileBody = z.object({ name: name(80) });
+/** plan rate-limit window: utilization 0-100, resets_at ISO 8601 */
+export interface UsageWindow { utilization: number | null; resets_at: string | null; locked_reason?: string | null }
+type Share = Array<{ name: string; pct: number }>;
+export interface UsageBreakdown {
+  request_count: number; session_count: number;
+  behaviors: Array<{ key: string; pct: number; count: number }>;
+  agents: Share; skills: Share; plugins: Share; mcp_servers: Share;
+}
+/** the terminal's /usage data (SDK get_usage, minus the per-session totals) */
+export interface PlanUsage {
+  subscription_type: string | null;
+  rate_limits_available: boolean;
+  rate_limits: {
+    five_hour?: UsageWindow | null; seven_day?: UsageWindow | null; seven_day_oauth_apps?: UsageWindow | null;
+    seven_day_opus?: UsageWindow | null; seven_day_sonnet?: UsageWindow | null;
+    model_scoped?: Array<UsageWindow & { display_name: string }>;
+    extra_usage?: { is_enabled: boolean; monthly_limit: number | null; used_credits: number | null; utilization: number | null; currency?: string | null } | null;
+    // undocumented fields the endpoint also returns today (passed through as-is, all optional)
+    limits?: Array<{ kind: string; group: string; percent: number | null; severity: string | null; resets_at: string | null; is_active?: boolean }>;
+    seven_day_breakdown?: { window_started_at?: string | null; rows: Array<{ key: string; display_name: string; percent: number }> } | null;
+    spend?: { used?: { amount_minor: number; currency: string; exponent: number } | null; limit?: { amount_minor: number; currency: string; exponent: number } | null; percent?: number | null; enabled?: boolean; disclaimer?: string | null } | null;
+  } | null;
+  behaviors: { day: UsageBreakdown; week: UsageBreakdown } | null;
+  fetchedAt: number;
+}
+export const createProfileBody =z.object({ name: name(80) });
 export const loginCodeBody = z.object({ code: z.string().trim().min(1).max(2048) });
 export const createSessionBody =z.object({ name: name(120), model: modelSchema.optional(), effort: effortSchema.optional(), routing: z.boolean().optional() });
 const tag = z.string().trim().toLowerCase().min(1).max(30).regex(/^[\p{L}\p{N}_-]+$/u);

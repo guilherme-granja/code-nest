@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { createSdkMcpServer, query, tool, type CanUseTool, type McpServerStatus, type PermissionResult, type Query, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
-import { EFFORTS, MODELS, type EventBody, type HistoryItem, type McpAction, type McpServerView, type Model, type ModelUsage, type ShellResult, type SlashCommandInfo, type UsageTotals } from '@ccui/shared';
+import { EFFORTS, MODELS, type EventBody, type HistoryItem, type McpAction, type McpServerView, type Model, type ModelUsage, type PlanUsage, type ShellResult, type SlashCommandInfo, type UsageTotals } from '@ccui/shared';
 import { z } from 'zod';
 import { visibleCommands } from '../commands';
 import { mapMessage } from './events';
@@ -221,6 +221,25 @@ class Live implements LiveSession {
 
 const IDLE_WAIT_MS = 30_000;
 const COMMANDS_TIMEOUT_MS = 25_000;
+const USAGE_TIMEOUT_MS = 45_000;
+
+// Plan usage (the terminal's /usage) for the account in `env`: short-lived process, control channel only, no tokens spent.
+// Spawned by the SDK itself (not a Transport) so it reads the given profile's login, not the active one.
+// ponytail: experimental SDK API; if it's renamed, this is the only call site
+export async function planUsage(env: NodeJS.ProcessEnv): Promise<PlanUsage> {
+  const input = channel<SDKUserMessage>();
+  const q = query({ prompt: input, options: { model: 'haiku', persistSession: false, settingSources: [], env } });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const timeout = new Promise<never>((_, rej) => { timer = setTimeout(() => rej(new Error('timeout reading plan usage')), USAGE_TIMEOUT_MS); });
+    const { session: _session, ...u } = await Promise.race([q.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET(), timeout]);
+    return { ...u, fetchedAt: Date.now() };
+  } finally {
+    clearTimeout(timer);
+    input.end();
+    q.close();
+  }
+}
 
 export class SdkRuntime implements ClaudeRuntime {
   constructor(private transport: Transport) {}

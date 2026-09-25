@@ -9,7 +9,7 @@ import {
 import { versionWarning, type Connections } from './connections';
 import { ensureMeta, listProjectSessions } from './domain';
 import { parseGitStatus } from './git';
-import { activate, DEFAULT_PROFILE, knownProfile, listProfiles, logout, removeProfile, sendCode, startLogin } from './profiles';
+import { activate, DEFAULT_PROFILE, knownProfile, listProfiles, logout, removeProfile, sendCode, startLogin, usageFor } from './profiles';
 import type { SessionHub } from './hub';
 import { todayDelta } from './runtime/jsonl';
 import { checkConnection, validClaudePath, validTarget } from './ssh-util';
@@ -281,7 +281,8 @@ export function buildApi({ store, hub, conns }: Deps) {
     if (!b) return bad(c, 'dados inválidos');
     return sendCode(id, b.code) ? c.body(null, 204) : bad(c, 'nenhum login em andamento');
   }));
-  api.post('/profiles/:id/logout', profileAction(async (id, c) => { await logout(id); return c.body(null, 204); }));
+  api.get('/profiles/:id/usage', profileAction(async (id, c) => c.json(await usageFor(id))));
+  api.post('/profiles/:id/logout',profileAction(async (id, c) => { await logout(id); return c.body(null, 204); }));
   api.delete('/profiles/:id', profileAction(async (id, c) => {
     if (id === DEFAULT_PROFILE) return bad(c, 'o perfil padrão não pode ser removido');
     await removeProfile(store, id);
