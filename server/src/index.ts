@@ -7,6 +7,7 @@ import type { ServerMsg } from '@ccui/shared';
 import { Connections } from './connections';
 import { connectionIdFor, openSpecFor } from './domain';
 import { SessionHub } from './hub';
+import { initProfiles } from './profiles';
 import { buildApi } from './routes';
 import { reportOrphans } from './runtime/local-transport';
 import { guard, makeToken } from './security';
@@ -21,6 +22,7 @@ if (HOST !== '127.0.0.1' && HOST !== 'localhost') {
 }
 
 const store = await openStore();
+await initProfiles(store);
 reportOrphans();
 let broadcast: (m: ServerMsg) => void = () => {};
 const conns = new Connections(store, (id, status, message) => broadcast({ type: 'connection.status', id, status, message }));

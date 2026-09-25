@@ -10,10 +10,11 @@ Node.js + Hono + WebSocket. No Controller/Service/Repository — modules are fil
 - `store.ts` — `JsonFile<T>` (atomic read/write with `.bak`), `openStore()` loads `config.json`/`projects.json`/`sessions.json`, `acquireLock()` — one backend per `DATA_DIR` via `~/.code-nest/lock` (PID).
 - `connections.ts` — `Connections`: active runtimes (local + configured SSH connections), periodically monitors SSH status.
 - `ws.ts` — `attachWs`: token-based auth handshake, dispatches client messages (`attach`, `detach`, `send`, `interrupt`, `shell`, `mcp`, `permission`); `send` is rejected with an explanation when `blockedSlash()` matches.
-- `routes.ts` — REST API: `/api/state`, `/api/config`, `/api/connections` (+ `/test`, `/:id/browse` folder browser), `/api/projects` (+ `/:id/sessions`, `/:id/commands`, `/:id/git`, `/:id/usage`), `/api/sessions/:id`, `/api/usage/today`.
+- `routes.ts` — REST API: `/api/state`, `/api/config`, `/api/connections` (+ `/test`, `/:id/browse` folder browser), `/api/projects` (+ `/:id/sessions`, `/:id/commands`, `/:id/git`, `/:id/usage`), `/api/sessions/:id`, `/api/usage/today`, `/api/profiles` (+ `/:id/activate|login|login/code|logout`, `DELETE /:id`).
 - `security.ts` — `guard` (token/host check), `makeToken`.
 - `ssh-util.ts` — SSH helpers: `claudeExpr`, `encodeCwd`, `explainSshError`, `runSsh`, `shq` (shell-quote), `sshArgv`, `SESSION_ID_RE`.
 - `commands.ts` — `blockedSlash` (rejects `/clear`, `/model`, `/fast`, `/advisor`, `/effort`, `/config` with a reason) and `visibleCommands` (drops blocked and terminal-only commands from the autocomplete list).
+- `profiles.ts` — Claude account profiles for local sessions: each extra profile is a `CLAUDE_CONFIG_DIR` under `~/.code-nest/profiles/<id>` holding only its login (`.credentials.json`, `.claude.json`); every other entry is symlinked to `~/.claude`, so skills/plugins/settings/session history stay shared. `activeConfigDir()` is injected by `localTransport.spawn`, so switching applies to new sessions only. Login/logout run `claude auth login|logout` with the profile's env; profile views never include tokens. SSH projects keep using the remote host's login.
 - `git.ts` — parses `git status --porcelain=v2 --branch` into `GitInfo`.
 
 ### `runtime/`

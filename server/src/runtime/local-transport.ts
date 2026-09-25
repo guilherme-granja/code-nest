@@ -5,6 +5,7 @@ import path from 'node:path';
 import { getSessionInfo, getSessionMessages, listSessions } from '@anthropic-ai/claude-agent-sdk';
 import type { HistoryItem } from '@ccui/shared';
 import { spawnManaged } from './child';
+import { activeConfigDir } from '../profiles';
 import { encodeCwd, SESSION_ID_RE } from '../ssh-util';
 import { blockText, cleanTags } from './events';
 import { costCheckpoints, lastCostState } from './jsonl';
@@ -16,7 +17,11 @@ export const SHELL_TIMEOUT_MS = 120_000;
 export const SHELL_MAX_OUTPUT = 200 * 1024;
 
 export const localTransport: Transport = {
-  spawn: (o, onStderr) => spawnManaged(o.command, o.args, { cwd: o.cwd, env: o.env as NodeJS.ProcessEnv, signal: o.signal }, onStderr),
+  // active profile applies at spawn time: sessions already running keep the account they started with
+  spawn: (o, onStderr) => {
+    const dir = activeConfigDir();
+    return spawnManaged(o.command, o.args, { cwd: o.cwd, env: { ...(o.env as NodeJS.ProcessEnv), ...(dir ? { CLAUDE_CONFIG_DIR: dir } : {}) }, signal: o.signal }, onStderr);
+  },
 
   async isDirectory(p) {
     try { return (await fs.stat(p)).isDirectory(); } catch { return false; }

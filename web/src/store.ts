@@ -6,7 +6,7 @@ import { disableNotify, enableNotify, notify, notifyEnabled } from './notify';
 import { createSocket } from './ws';
 
 export interface Tab { projectId: string; sessionId: string }
-export interface Ui { palette: boolean; help: boolean; newSession: boolean; newFor: string | null; term: boolean; settingsFor: string | null; appSettings: boolean; spend: boolean }
+export interface Ui { palette: boolean; help: boolean; newSession: boolean; newFor: string | null; term: boolean; settingsFor: string | null; appSettings: boolean; spend: boolean; profile: boolean }
 export const SIDEBAR_W_MIN = 224;
 export const SIDEBAR_W_MAX = 420;
 export const SIDEBAR_W_DEFAULT = 288;
@@ -102,7 +102,7 @@ export const useApp = create<App>((set, get) => {
 
   return {
     tokenMissing: false, up: false, config: null, projects: [], rows: {}, active: null, tabs: [], chats: {}, status: {},
-    attention: {}, notifyOn: notifyEnabled(), ui: { palette: false, help: false, newSession: false, newFor: null, term: false, settingsFor: null, appSettings: false, spend: false },
+    attention: {}, notifyOn: notifyEnabled(), ui: { palette: false, help: false, newSession: false, newFor: null, term: false, settingsFor: null, appSettings: false, spend: false, profile: false },
     layout: loadLayout(), commands: {}, attachments: {},
 
     async start() {

@@ -26,6 +26,7 @@ The terminal is great for coding, not so great for tracking several Claude Code 
 
 **Visibility and control**
 - **Spend dashboard**: today's spend, broken down by model and by project, with a per-project drill-down into recent sessions.
+- **Profiles (multiple Claude accounts)**: the Profile page shows everything the CLI knows about each logged-in account (`claude auth status`, account/org/plan details, credential expiry; never tokens). Add profiles, log in/out, and switch the account used by new local sessions with one click; each profile is its own `CLAUDE_CONFIG_DIR` under `~/.code-nest/profiles/` that shares skills, plugins, settings and session history with `~/.claude` via symlinks. SSH projects keep the remote host's login.
 - **Read-only terminal**: shows `!cmd` runs and subagent logs (Task tool). It never accepts direct input, so permission approval is never bypassed.
 - **Global settings**: default model/effort and remote (SSH) servers, editable at runtime.
 - **Search/tags/favorites/archiving** for sessions, a **Git status bar**, **themes** (light/dark/system), **browser notifications**, **keyboard shortcuts**, a resizable sidebar, and a **command palette** (`Ctrl/Cmd+K`).
@@ -114,5 +115,6 @@ No automated test suite by project choice (see [`docs/testing.md`](docs/testing.
 | v1.1.0 | "Precision dark" visual redesign (sidebar, tabs, chat, cards, terminal, composer) |
 | v1.2.0 | Renamed to Code Nest, global/per-project settings, folder browser, file attachments, spend dashboard, composer polish (slash/`!` highlighting, resizable box, running-tool indicator), per-session spend limit removed, `/mcp` panel |
 | v1.3.0 | Skills-invoked badge and modal on the turn summary, Refresh button (reload skills/plugins into the session), Code Nest data dir (`~/.code-nest`) with automatic migration, updated docs |
+| v1.4.0 | Profile page and multiple Claude account profiles (add, log in/out, switch for new local sessions) |
 
 The design and decision history for each feature is in `docs/superpowers/{specs,plans}/`.

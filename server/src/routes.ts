@@ -3,12 +3,13 @@ import path from 'node:path';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import {
-  createConnectionBody, createProjectBody, createSessionBody, lastConnectionBody, patchConfigBody, patchProjectBody, patchSessionBody, uuidSchema,
+  createConnectionBody, createProfileBody, createProjectBody, createSessionBody, lastConnectionBody, loginCodeBody, patchConfigBody, patchProjectBody, patchSessionBody, uuidSchema,
   type Connection, type Project, type SessionMeta, type SlashCommandInfo,
 } from '@ccui/shared';
 import { versionWarning, type Connections } from './connections';
 import { ensureMeta, listProjectSessions } from './domain';
 import { parseGitStatus } from './git';
+import { activate, DEFAULT_PROFILE, knownProfile, listProfiles, logout, removeProfile, sendCode, startLogin } from './profiles';
 import type { SessionHub } from './hub';
 import { todayDelta } from './runtime/jsonl';
 import { checkConnection, validClaudePath, validTarget } from './ssh-util';
@@ -254,6 +255,38 @@ export function buildApi({ store, hub, conns }: Deps) {
     await store.sessions.save();
     return c.body(null, 204);
   });
+
+  // Claude account profiles (local sessions only), see profiles.ts
+  api.get('/profiles', async (c) => c.json(await listProfiles(store)));
+
+  api.post('/profiles', async (c) => {
+    const b = await body(c, createProfileBody);
+    if (!b) return bad(c, 'dados inválidos');
+    const created = { id: randomUUID(), name: b.name };
+    (store.config.data.profiles ??= []).push(created);
+    await store.config.save();
+    await startLogin(created.id);
+    return c.json(created);
+  });
+
+  const profileAction = (fn: (id: string, c: Context) => Promise<Response>) => async (c: Context) => {
+    const id = c.req.param('id') ?? '';
+    if (!knownProfile(store, id)) return c.json({ error: 'perfil desconhecido' }, 404);
+    try { return await fn(id, c); } catch (e) { return bad(c, (e as Error).message); }
+  };
+  api.post('/profiles/:id/activate', profileAction(async (id, c) => { await activate(store, id); return c.body(null, 204); }));
+  api.post('/profiles/:id/login', profileAction(async (id, c) => { await startLogin(id); return c.body(null, 204); }));
+  api.post('/profiles/:id/login/code', profileAction(async (id, c) => {
+    const b = await body(c, loginCodeBody);
+    if (!b) return bad(c, 'dados inválidos');
+    return sendCode(id, b.code) ? c.body(null, 204) : bad(c, 'nenhum login em andamento');
+  }));
+  api.post('/profiles/:id/logout', profileAction(async (id, c) => { await logout(id); return c.body(null, 204); }));
+  api.delete('/profiles/:id', profileAction(async (id, c) => {
+    if (id === DEFAULT_PROFILE) return bad(c, 'o perfil padrão não pode ser removido');
+    await removeProfile(store, id);
+    return c.body(null, 204);
+  }));
 
   return api;
 }

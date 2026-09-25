@@ -1,4 +1,4 @@
-import type { Config, ConnStatus, Connection, DirEntry, Effort, GitInfo, Model, Project, ProjectUsageView, SessionRow, SlashCommandInfo, TodayUsage } from '@ccui/shared';
+import type { Config, ConnStatus, Connection, DirEntry, Effort, GitInfo, Model, ProfileView, Project, ProjectUsageView, SessionRow, SlashCommandInfo, TodayUsage } from '@ccui/shared';
 
 const KEY = 'ccui-token';
 let token: string | null = null;
@@ -45,6 +45,11 @@ export const api = {
   git: (pid: string) => req<GitInfo | null>('GET', `/api/projects/${pid}/git`),
   usageToday: () => req<TodayUsage>('GET', '/api/usage/today'),
   projectUsage: (id: string) => req<ProjectUsageView>('GET', `/api/projects/${id}/usage`),
+  profiles: () => req<ProfileView[]>('GET', '/api/profiles'),
+  addProfile: (name: string) => req<{ id: string; name: string }>('POST', '/api/profiles', { name }),
+  profileAction: (id: string, action: 'activate' | 'login' | 'logout') => req<void>('POST', `/api/profiles/${id}/${action}`),
+  loginCode: (id: string, code: string) => req<void>('POST', `/api/profiles/${id}/login/code`, { code }),
+  delProfile: (id: string) => req<void>('DELETE', `/api/profiles/${id}`),
   browse: (connectionId: string, path: string | null, kind: 'dir' | 'all' = 'dir') =>
     req<{ path: string; entries: DirEntry[] }>('GET', `/api/connections/${connectionId}/browse?${path ? `path=${encodeURIComponent(path)}&` : ''}kind=${kind}`),
 };

@@ -20,6 +20,18 @@ export interface Config {
   lastConnectionId: string | null;
   defaults: { model: Model; effort: Effort };
   connections: Connection[];
+  /** extra Claude accounts, each with its own CLAUDE_CONFIG_DIR; the implicit 'default' profile is the user's own ~/.claude */
+  profiles?: Array<{ id: string; name: string }>;
+  /** profile used by new local sessions; absent = 'default' */
+  activeProfile?: string;
+}
+/** what `claude auth status --json` + the profile's `.claude.json` (oauthAccount) + `.credentials.json` metadata expose; never tokens */
+export interface ProfileView {
+  id: string; name: string; active: boolean;
+  status: Record<string, unknown> | null;
+  account: Record<string, unknown> | null;
+  credentials: { expiresAt?: number; refreshTokenExpiresAt?: number; scopes?: string[]; subscriptionType?: string; rateLimitTier?: string } | null;
+  login: { running: boolean; url?: string; output: string } | null;
 }
 export interface SessionRow { sessionId: string; name: string; lastModified: number; live: boolean; tags: string[]; favorite: boolean; archived: boolean }
 export interface SlashCommandInfo { name: string; description: string; argumentHint: string; aliases?: string[]; builtin: boolean }
@@ -35,7 +47,9 @@ export const createConnectionBody = z.object({ target: z.string().min(1).max(255
 export const patchProjectBody = z.object({ name: name(80).optional(), lean: z.boolean().optional(), routing: z.boolean().optional(), bypass: z.boolean().optional(), model: modelSchema.optional(), effort: effortSchema.optional() });
 export const patchConfigBody = z.object({ model: modelSchema.optional(), effort: effortSchema.optional() })
   .refine((b) => b.model !== undefined || b.effort !== undefined, { message: 'nada para alterar' });
-export const createSessionBody = z.object({ name: name(120), model: modelSchema.optional(), effort: effortSchema.optional(), routing: z.boolean().optional() });
+export const createProfileBody = z.object({ name: name(80) });
+export const loginCodeBody = z.object({ code: z.string().trim().min(1).max(2048) });
+export const createSessionBody =z.object({ name: name(120), model: modelSchema.optional(), effort: effortSchema.optional(), routing: z.boolean().optional() });
 const tag = z.string().trim().toLowerCase().min(1).max(30).regex(/^[\p{L}\p{N}_-]+$/u);
 export const patchSessionBody = z.object({
   projectId: z.string().min(1),
